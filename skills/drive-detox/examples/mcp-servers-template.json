@@ -1,0 +1,9 @@
+{
+  "_comment": "Template for a project .mcp.json. Google's own Drive MCP server CANNOT be added this way: it rejects Claude Code's auth with 'does not support dynamic client registration' and must be added as a custom connector on claude.ai. This template is for a read-only Drive MCP server that does support it. Add the matching deny rules from claude-settings-readonly.json, and verify them with scripts/check_deny_rules.py before connecting.",
+  "mcpServers": {
+    "drive": {
+      "type": "url",
+      "url": "https://example.invalid/replace-me/mcp"
+    }
+  }
+}

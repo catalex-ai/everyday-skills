@@ -150,12 +150,25 @@ class ReportTests(unittest.TestCase):
 
     def test_explains_google_native_files_with_no_size(self):
         text, _ = self.render()
-        self.assertIn("report no size", text)
-        self.assertIn("Google Docs/Sheets/Slides", text)
+        self.assertIn("reports no size", text)
+        self.assertIn("Google Doc/Sheet/Slide", text)
+        self.assertIn("never report a size", text)
 
     def test_states_plainly_that_nothing_changed(self):
         text, _ = self.render()
         self.assertIn("Nothing was changed.", text)
+
+    def test_metadata_only_wording_when_contents_were_not_read(self):
+        text, _ = detox.report(Path("/d"), self.items, 730, True, [], contents_read=False)
+        self.assertIn("Only metadata was read", text)
+        self.assertNotIn("read only to checksum", text)
+
+    def test_plural_google_native_wording(self):
+        items = self.items + [
+            item("/d/sheet", "sheet", None, "2026-09-01T00:00:00Z",
+                 mime="application/vnd.google-apps.spreadsheet")]
+        text, _ = detox.report(Path("/d"), items, 730, True, [])
+        self.assertIn("2 are Google Docs/Sheets/Slides", text)
 
     def test_without_hashing_it_says_duplicates_are_name_matched(self):
         text, _ = self.render(hashed=False)

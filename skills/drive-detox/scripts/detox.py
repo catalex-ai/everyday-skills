@@ -6,6 +6,7 @@ renames, or deletes a file. The only thing written is a report file, and only
 when --save is passed.
 """
 import argparse
+import json
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -111,7 +112,7 @@ def display(path, item):
         return item.get("name") or identity
 
 
-def report(target, items, older_than_days, hashed, skipped):
+def report(target, items, older_than_days, hashed, skipped, contents_read=True):
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(days=older_than_days)
     cutoff_iso = cutoff.isoformat().replace("+00:00", "Z")
@@ -136,9 +137,13 @@ def report(target, items, older_than_days, hashed, skipped):
     measured = human_size(data["known_size_total_bytes"])
     out(f"{plural(data['file_count'], 'file')}  ·  {measured} measured")
     if data["unknown_size_count"]:
-        extra = (f" ({native:,} of them are Google Docs/Sheets/Slides, which report no size)"
-                 if native else "")
-        out(f"{plural(data['unknown_size_count'], 'file')} report no size{extra}")
+        extra = ""
+        if native:
+            which = ("1 is a Google Doc/Sheet/Slide" if native == 1
+                     else f"{native:,} are Google Docs/Sheets/Slides")
+            extra = f" ({which}, and those never report a size)"
+        verb = "reports" if data["unknown_size_count"] == 1 else "report"
+        out(f"{plural(data['unknown_size_count'], 'file')} {verb} no size{extra}")
     if not hashed:
         out("Contents were not read, so duplicates below are matched by name, not by content.")
     if skipped:
@@ -195,8 +200,14 @@ def report(target, items, older_than_days, hashed, skipped):
         if tally.get(name):
             out(f"  {name:<22} {plural(tally[name], 'file'):>12}")
     out("")
-    out("Nothing was changed. No file was read for content"
-        + (", except to checksum it." if hashed else ", moved, renamed or deleted."))
+    if not contents_read:
+        out("Nothing was changed. Only metadata was read: no file was downloaded, "
+            "moved, renamed or deleted.")
+    elif hashed:
+        out("Nothing was changed. Files were read only to checksum them; none was "
+            "moved, renamed or deleted.")
+    else:
+        out("Nothing was changed. No file was read for content, moved, renamed or deleted.")
     out("Deleting stays yours to do: archiving does not free space, only emptying trash does.")
     return "\n".join(lines), data
 
@@ -205,6 +216,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", default="auto",
                         help="folder to audit, or 'auto' to find Google Drive for desktop")
+    parser.add_argument("--from-inventory", type=Path,
+                        help="report on an existing inventory JSON instead of scanning a folder. "
+                             "Use for Drive data gathered over MCP or the Drive API")
+    parser.add_argument("--label", default=None,
+                        help="what to call the audited source in the report header")
     parser.add_argument("--older-than-days", type=int, default=730)
     parser.add_argument("--hash", dest="hash_mode", choices=("auto", "on", "off"), default="auto",
                         help="auto reads contents for local folders but not for a cloud mount, "
@@ -221,6 +237,27 @@ def main():
         return
     if args.older_than_days < 0:
         parser.error("--older-than-days must be non-negative")
+
+    if args.from_inventory:
+        try:
+            items = json.loads(args.from_inventory.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            sys.exit(f"Cannot read inventory: {exc}")
+        if not isinstance(items, list) or any(not isinstance(i, dict) for i in items):
+            sys.exit("Inventory must be a JSON list of objects. "
+                     "For raw MCP output, run it through mcp_bridge.py first.")
+        hashed = any("md5Checksum" in item for item in items)
+        source = args.label or "Google Drive"
+        text, data = report(Path(source), items, args.older_than_days, hashed, [],
+                            contents_read=False)
+        if args.json:
+            print(json.dumps(data, indent=2, ensure_ascii=False))
+        else:
+            print(text)
+        if args.save:
+            Path(args.save).write_text(text + "\n", encoding="utf-8")
+            print(f"\nReport saved to {args.save}", file=sys.stderr)
+        return
 
     target, is_cloud, note = resolve_target(args.target)
     if note:
@@ -239,7 +276,6 @@ def main():
     )
     text, data = report(target, items, args.older_than_days, hashed, skipped)
     if args.json:
-        import json
         print(json.dumps(data, indent=2, ensure_ascii=False))
     else:
         print(text)

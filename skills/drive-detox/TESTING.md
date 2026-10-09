@@ -18,7 +18,7 @@ python3 -m unittest discover -s skills/drive-detox/tests -v
 Expect the last lines to read:
 
 ```
-Ran 51 tests in 0.0XXs
+Ran 88 tests in 0.0XXs
 
 OK
 ```
@@ -101,6 +101,27 @@ Checks:
 - Open one duplicate group in Drive and confirm the files match. Same `md5Checksum` is strong evidence; same name alone is not.
 
 Then drop `--max-pages` for the full run. The token expires in about an hour; re-run the `export` line to refresh it.
+
+## 6. The MCP path, without a Drive connection
+
+The normalizer and the permission check can be exercised now, on a fixture:
+
+```bash
+python3 skills/drive-detox/scripts/mcp_bridge.py \
+  skills/drive-detox/examples/mcp-response.json --output /tmp/mcp.json
+
+python3 skills/drive-detox/scripts/detox.py --from-inventory /tmp/mcp.json --label "Google Drive"
+```
+
+The fixture deliberately contains alias field names (`fileId`, `title`, `updatedAt`, `md5`), a folder, a Google Doc with no size, and an id repeated across pages. Expect the normalizer to report `1 folder skipped` and `1 repeated id skipped`, and the report to find one duplicate group worth 500 MB.
+
+Then check the permission layer for a server name that is not protected:
+
+```bash
+python3 skills/drive-detox/scripts/check_deny_rules.py --server "claude.ai Google Drive"
+```
+
+It prints `PASS` or a `FAIL` with the exact JSON to paste. Run it before authenticating anything, not after.
 
 ## Prove it is read-only
 

@@ -1,0 +1,8 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"files\": [{\"fileId\": \"1aA\", \"title\": \"Q3 launch video.mp4\", \"mime_type\": \"video/mp4\", \"sizeBytes\": 524288000, \"updatedAt\": \"2021-03-04T10:00:00Z\", \"md5\": \"abc123\", \"webUrl\": \"https://drive.google.com/file/d/1aA/view\"}, {\"fileId\": \"2bB\", \"title\": \"Q3 launch video (copy).mp4\", \"mime_type\": \"video/mp4\", \"sizeBytes\": 524288000, \"updatedAt\": \"2021-03-05T10:00:00Z\", \"md5\": \"abc123\"}, {\"fileId\": \"3cC\", \"title\": \"Team notes\", \"mime_type\": \"application/vnd.google-apps.document\", \"updatedAt\": \"2026-09-20T10:00:00Z\"}, {\"fileId\": \"4dD\", \"title\": \"Archive\", \"mime_type\": \"application/vnd.google-apps.folder\"}, {\"fileId\": \"1aA\", \"title\": \"Q3 launch video.mp4\", \"mime_type\": \"video/mp4\", \"sizeBytes\": 524288000, \"updatedAt\": \"2021-03-04T10:00:00Z\", \"md5\": \"abc123\"}]}"
+    }
+  ]
+}

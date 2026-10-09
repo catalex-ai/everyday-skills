@@ -25,6 +25,20 @@ jobs:
           python skills/drive-detox/scripts/scan_local.py skills --output "$RUNNER_TEMP/inventory.json"
           python skills/drive-detox/scripts/analyze_inventory.py "$RUNNER_TEMP/inventory.json" --older-than-days 730 --output "$RUNNER_TEMP/report.json"
           python -c "import json,os,sys; r=json.load(open(os.environ['RUNNER_TEMP']+'/report.json')); sys.exit(0 if r['file_count']>0 else 'scan produced no files')"
+      - name: MCP path end to end
+        run: |
+          python skills/drive-detox/scripts/mcp_bridge.py \
+            skills/drive-detox/examples/mcp-response.json --output "$RUNNER_TEMP/mcp.json"
+          python skills/drive-detox/scripts/detox.py \
+            --from-inventory "$RUNNER_TEMP/mcp.json" --label "Google Drive"
+      - name: Deny-rule checker reports a missing rule
+        run: |
+          if python skills/drive-detox/scripts/check_deny_rules.py --server nonexistent_server; then
+            echo "Expected a non-zero exit for an unprotected server"
+            exit 1
+          fi
+      - name: Deny-rule checker passes on the shipped settings
+        run: python skills/drive-detox/scripts/check_deny_rules.py --server google_drive --settings .claude/settings.json
       - name: Guard against destructive calls in read-only scripts
         run: |
           if grep -nE "os\.remove|os\.unlink|os\.rmdir|shutil\.(move|rmtree)|\.unlink\(|\.rename\(|\.chmod\(|subprocess|os\.system" skills/drive-detox/scripts/*.py; then

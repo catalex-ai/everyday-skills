@@ -73,9 +73,38 @@ Always run the scope check first and show its output — it is Google's own stat
 
 ## Drive over MCP
 
-Only if a read-only Google Drive MCP server is already connected through claude.ai. `claude mcp list` reporting `Connected` means only that the URL answered; a server added directly in Claude Code cannot authenticate to Google and fails with `Incompatible auth server: does not support dynamic client registration`.
+The whole path is built and tested; only the connection is missing. Nothing here needs changing when a server appears.
 
-Use only `search_files`, `list_recent_files`, `get_file_metadata`. Never `create_file` or `copy_file`. Collect `id`, `name`, `mimeType`, `size`, `modifiedTime`, `md5Checksum`, parents, `webViewLink`; follow pagination to the end or state where coverage stopped; save as a JSON list and run it through `scripts/analyze_inventory.py` so every route produces the same report.
+1. **Find the server.**
+   ```bash
+   claude mcp list
+   ```
+   Look for a URL containing `drivemcp.googleapis.com`, or another server clearly offering Drive. `Connected` means only that the URL answered — a server added directly in Claude Code cannot authenticate to Google and fails on first use with `Incompatible auth server: does not support dynamic client registration`. Those are added on claude.ai; see `references/google-drive-setup.md`.
+
+2. **Prove the write tools are blocked, before using the connection.**
+   ```bash
+   python3 scripts/check_deny_rules.py --server "claude.ai Google Drive"
+   ```
+   Pass the name exactly as `claude mcp list` printed it. A `PASS` means `create_file` and `copy_file` are denied outright. A `FAIL` prints the JSON to add to `.claude/settings.json`; add it, re-run, and only continue on a pass. It also catches a rule that differs only by case, which would silently never match.
+
+3. **Collect metadata.** Call only `search_files`, `list_recent_files`, and `get_file_metadata`. Never `create_file` or `copy_file`. Ask for `id`, `name`, `mimeType`, `size`, `modifiedTime`, `md5Checksum`, `parents`, `webViewLink`. Follow the page token to the end; if you stop early, say exactly where. Save each raw response verbatim, as it came back:
+   ```bash
+   # one file per page, or a single file holding a list of them
+   /tmp/mcp-page-1.json, /tmp/mcp-page-2.json, ...
+   ```
+
+4. **Normalize.** Servers differ in shape and field names, so never hand-edit the output:
+   ```bash
+   python3 scripts/mcp_bridge.py /tmp/mcp-page-1.json --output /tmp/drive-inventory.json
+   ```
+   It accepts a bare list, a `{"files": [...]}` wrapper, or MCP content blocks whose text is itself JSON; maps `fileId`/`title`/`updatedAt`/`md5` and friends onto the Drive names; drops folders; drops ids repeated across overlapping pages. It prints how many records lack a size, date, or checksum — relay that, because it bounds what the audit can claim. For several pages, pass a JSON array of the page payloads.
+
+5. **Report**, through the same path every other route uses:
+   ```bash
+   python3 scripts/detox.py --from-inventory /tmp/drive-inventory.json --label "Google Drive"
+   ```
+
+If the server has no checksums, the report says duplicates were matched by name and so should you.
 
 ## Reporting back
 

@@ -16,7 +16,7 @@ Three routes, easiest first:
 
 1. **Google Drive for desktop.** Install it, sign in, and your Drive is a folder — `detox.py --target auto` finds it. No Cloud console, no tokens. Claude can install it for you with your approval.
 2. **The Drive API**, for checksum-accurate duplicates across a whole Drive without downloading it. Needs a `drive.readonly` token you mint yourself; `drive_inventory.py` issues HTTP GET requests and nothing else, and refuses to list a single file if the token carries any scope beyond read-only.
-3. **A claude.ai MCP connector**, if you want Claude querying Drive live in conversation.
+3. **A claude.ai MCP connector**, if you want Claude querying Drive live in conversation. The code path is built and tested — `mcp_bridge.py` normalizes whatever the server returns into the shared report, and `check_deny_rules.py` verifies the write tools are blocked before you connect — so only the authentication is left to do.
 
 ## Install into a project
 
@@ -58,7 +58,7 @@ It scans, analyzes, and prints a finished report. `--target auto` finds Google D
 python3 -m unittest discover -s skills/drive-detox/tests -v
 ```
 
-51 tests. Full walkthrough, including how to prove the read-only claim yourself: [TESTING.md](TESTING.md).
+88 tests. Full walkthrough, including how to prove the read-only claim yourself: [TESTING.md](TESTING.md).
 
 ## Known limits
 

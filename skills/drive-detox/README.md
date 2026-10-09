@@ -12,14 +12,11 @@ First skill in CatalEx Everyday Skills.
 
 **Drive mode** audits your real Google Drive, two ways: a `drive.readonly` access token you mint yourself, or a read-only Google Drive MCP server connected through claude.ai. This repo bundles no credentials and no Drive connection — see [references/google-drive-setup.md](references/google-drive-setup.md).
 
-```bash
-export GOOGLE_DRIVE_ACCESS_TOKEN="$(gcloud auth application-default print-access-token)"
-python3 skills/drive-detox/scripts/drive_inventory.py --check-scopes-only          # proves the token cannot write
-python3 skills/drive-detox/scripts/drive_inventory.py --output /tmp/drive.json
-python3 skills/drive-detox/scripts/analyze_inventory.py /tmp/drive.json --older-than-days 730
-```
+Three routes, easiest first:
 
-`drive_inventory.py` issues HTTP GET requests and nothing else, and it refuses to list a single file if the token carries any scope beyond read-only.
+1. **Google Drive for desktop.** Install it, sign in, and your Drive is a folder — `detox.py --target auto` finds it. No Cloud console, no tokens. Claude can install it for you with your approval.
+2. **The Drive API**, for checksum-accurate duplicates across a whole Drive without downloading it. Needs a `drive.readonly` token you mint yourself; `drive_inventory.py` issues HTTP GET requests and nothing else, and refuses to list a single file if the token carries any scope beyond read-only.
+3. **A claude.ai MCP connector**, if you want Claude querying Drive live in conversation.
 
 ## Install into a project
 
@@ -32,16 +29,19 @@ Open Claude Code in that project and ask for an audit, or invoke `/drive-detox`.
 
 Recommended: also copy [examples/claude-settings-readonly.json](examples/claude-settings-readonly.json) to `.claude/settings.json` so the write tools are denied at the permission layer, not just by the prompt. A denied tool cannot be called at all — Claude cannot even ask you to approve it.
 
-New to the terminal? Follow [WALKTHROUGH.md](WALKTHROUGH.md) instead — every command spelled out, in order, with what the output should look like.
+Not technical? [WALKTHROUGH.md](WALKTHROUGH.md) is the short version: install once, then ask in plain English. You run three things, and only three, because nobody can do them for you — sign in to Google, approve an install, and decide what gets deleted.
 
 ## Try it in one minute
 
+Installed as a skill, you just talk to it — "clean up my Downloads folder", "my Drive is full, what's eating the space" — and Claude runs everything itself.
+
+By hand, it is one command:
+
 ```bash
-python3 skills/drive-detox/scripts/scan_local.py ~/Downloads --output /tmp/inventory.json
-python3 skills/drive-detox/scripts/analyze_inventory.py /tmp/inventory.json --older-than-days 730
+python3 skills/drive-detox/scripts/detox.py --target ~/Downloads
 ```
 
-Write the inventory outside the repo — it lists your real file names.
+It scans, analyzes, and prints a finished report. `--target auto` finds Google Drive for desktop, `--diagnose` shows what is set up, `--save <path>` keeps a copy.
 
 ## What the report tells you
 
@@ -58,7 +58,7 @@ Write the inventory outside the repo — it lists your real file names.
 python3 -m unittest discover -s skills/drive-detox/tests -v
 ```
 
-30 tests. Full walkthrough, including how to prove the read-only claim yourself: [TESTING.md](TESTING.md).
+51 tests. Full walkthrough, including how to prove the read-only claim yourself: [TESTING.md](TESTING.md).
 
 ## Known limits
 

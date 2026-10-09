@@ -16,10 +16,9 @@ mkdir -p .claude/skills
 cp -R skills/drive-detox .claude/skills/drive-detox
 ```
 
-Try it without any setup:
+Then just ask — "clean up my Downloads folder" — and the skill runs itself. By hand it is one command:
 ```bash
-python3 skills/drive-detox/scripts/scan_local.py ~/Downloads --output /tmp/inventory.json
-python3 skills/drive-detox/scripts/analyze_inventory.py /tmp/inventory.json --older-than-days 730
+python3 skills/drive-detox/scripts/detox.py --target ~/Downloads
 ```
 
 ## Principles

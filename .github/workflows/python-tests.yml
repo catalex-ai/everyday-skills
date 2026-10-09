@@ -16,6 +16,10 @@ jobs:
         run: python -m unittest discover -s skills/drive-detox/tests -v
       - name: Run sample analyzer
         run: python skills/drive-detox/scripts/analyze_inventory.py skills/drive-detox/examples/inventory.json --older-than-days 730
+      - name: One-command audit end to end
+        run: python skills/drive-detox/scripts/detox.py --target skills --older-than-days 730
+      - name: Setup diagnosis runs anywhere
+        run: python skills/drive-detox/scripts/detox.py --diagnose
       - name: Local scan end to end
         run: |
           python skills/drive-detox/scripts/scan_local.py skills --output "$RUNNER_TEMP/inventory.json"

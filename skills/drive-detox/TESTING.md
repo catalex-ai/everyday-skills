@@ -18,7 +18,7 @@ python3 -m unittest discover -s skills/drive-detox/tests -v
 Expect the last lines to read:
 
 ```
-Ran 30 tests in 0.0XXs
+Ran 51 tests in 0.0XXs
 
 OK
 ```

@@ -58,7 +58,7 @@ It scans, analyzes, and prints a finished report. `--target auto` finds Google D
 python3 -m unittest discover -s skills/drive-detox/tests -v
 ```
 
-88 tests. Full walkthrough, including how to prove the read-only claim yourself: [TESTING.md](TESTING.md).
+94 tests. Full walkthrough, including how to prove the read-only claim yourself: [TESTING.md](TESTING.md).
 
 ## Known limits
 

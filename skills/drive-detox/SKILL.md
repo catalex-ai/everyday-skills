@@ -42,7 +42,9 @@ python3 scripts/detox.py --target ~/Downloads --older-than-days 730
 
 `detox.py` finds the files, analyzes them, and prints a finished report: headline counts, biggest files, duplicate groups with reclaimable bytes, files untouched since the cutoff, and a KEEP / REVIEW / ARCHIVE CANDIDATE / DUPLICATE CANDIDATE tally. There is no second command to chain, and no JSON for the user to read.
 
-Useful flags: `--target auto` (find Google Drive for desktop), `--hash on|off|auto`, `--include-hidden`, `--save <path>`, `--json` (for your own further analysis, never to show a user), `--older-than-days` (365 for a year, 1095 for three).
+Useful flags: `--target auto` (find Google Drive for desktop), `--hash on|off|auto`, `--min-size-mb`, `--include-hidden`, `--save <path>`, `--json` (for your own further analysis, never to show a user), `--older-than-days` (365 for a year, 1095 for three), `--from-inventory` (report on Drive data gathered over MCP or the API).
+
+If the report comes back with thousands of duplicate groups worth very little, the folder contains app bundles or project files, not clutter the user can act on. Re-run with `--min-size-mb 1` and say that you did. Groups of empty or sizeless files are already dropped, since every zero-byte file shares one checksum.
 
 ### Choosing the target
 

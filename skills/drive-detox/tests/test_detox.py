@@ -177,5 +177,39 @@ class ReportTests(unittest.TestCase):
         self.assertNotIn("reclaimable", text)
 
 
+class NoiseFilterTests(unittest.TestCase):
+    """Thousands of tiny or empty duplicates are noise, not findings."""
+
+    def test_zero_byte_groups_are_dropped(self):
+        groups = [{"checksum": "e", "files": [item("1", "a", 0), item("2", "b", 0)]}]
+        self.assertEqual(detox.meaningful_duplicates(groups), [])
+
+    def test_unknown_size_groups_are_dropped(self):
+        groups = [{"checksum": "u", "files": [item("1", "a"), item("2", "b")]}]
+        self.assertEqual(detox.meaningful_duplicates(groups), [])
+
+    def test_real_groups_survive(self):
+        groups = [{"checksum": "r", "files": [item("1", "a", 100), item("2", "b", 100)]}]
+        self.assertEqual(len(detox.meaningful_duplicates(groups)), 1)
+
+    def test_report_says_empty_groups_are_worth_nothing(self):
+        items = [item("1", "a.txt", 0, "2026-01-01T00:00:00Z"),
+                 item("2", "b.txt", 0, "2026-01-02T00:00:00Z")]
+        for record in items:
+            record["md5Checksum"] = "d41d8cd98f00b204e9800998ecf8427e"
+        text, _ = detox.report(Path("/d"), items, 730, True, [])
+        self.assertIn("0 groups", text)
+        self.assertIn("worth nothing", text)
+
+    def test_size_floor_keeps_big_files_and_unknown_sizes(self):
+        items = [item("1", "big", 2 * 1024 * 1024), item("2", "small", 1024), item("3", "doc")]
+        kept = detox.apply_size_floor(items, 1)
+        self.assertEqual([record["id"] for record in kept], ["1", "3"])
+
+    def test_size_floor_of_zero_changes_nothing(self):
+        items = [item("1", "small", 1)]
+        self.assertIs(detox.apply_size_floor(items, 0), items)
+
+
 if __name__ == "__main__":
     unittest.main()

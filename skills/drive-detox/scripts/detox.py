@@ -69,6 +69,21 @@ def diagnose():
     print("\nReady to audit:", "your Google Drive" if mounts else "any local folder")
 
 
+def meaningful_duplicates(groups):
+    """Drop groups a person cannot act on: empty files, and files of unknown size.
+
+    Every zero-byte file shares one checksum, so they group together and waste
+    nothing. Reporting them as duplicates is noise.
+    """
+    kept = []
+    for group in groups:
+        sizes = [parse_size(item.get("size")) for item in group["files"]]
+        known = [size for size in sizes if size is not None and size > 0]
+        if len(known) > 1:
+            kept.append(group)
+    return kept
+
+
 def duplicate_waste(groups):
     """Bytes that would come back if every group kept exactly one copy."""
     total = 0
@@ -112,6 +127,19 @@ def display(path, item):
         return item.get("name") or identity
 
 
+def apply_size_floor(items, min_size_mb):
+    """Keep files at or above the floor, plus any whose size is unknown."""
+    if not min_size_mb:
+        return items
+    floor = int(min_size_mb * 1024 * 1024)
+    kept = []
+    for item in items:
+        size = parse_size(item.get("size"))
+        if size is None or size >= floor:
+            kept.append(item)
+    return kept
+
+
 def report(target, items, older_than_days, hashed, skipped, contents_read=True):
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(days=older_than_days)
@@ -119,7 +147,9 @@ def report(target, items, older_than_days, hashed, skipped, contents_read=True):
     data = analyze(items, older_than_days=older_than_days, now=now)
 
     native = sum(1 for item in items if str(item.get("mimeType", "")).startswith(GOOGLE_NATIVE))
-    groups = data["exact_duplicate_groups"]
+    all_groups = data["exact_duplicate_groups"]
+    groups = meaningful_duplicates(all_groups)
+    empty_groups = len(all_groups) - len(groups)
     waste = duplicate_waste(groups)
     duplicate_ids = set()
     for group in groups:
@@ -161,6 +191,10 @@ def report(target, items, older_than_days, hashed, skipped, contents_read=True):
 
     if hashed:
         out(f"DUPLICATES  ·  {plural(len(groups), 'group')}  ·  {human_size(waste)} reclaimable")
+        if empty_groups:
+            noun = "group" if empty_groups == 1 else "groups"
+            more = "" if len(groups) == 0 else "more "
+            out(f"  ({empty_groups:,} {more}{noun} of empty or sizeless files, worth nothing)")
         for group in sorted(groups, key=lambda g: -(parse_size(g["files"][0].get("size")) or 0))[:10]:
             files = group["files"]
             size = human_size(parse_size(files[0].get("size")))
@@ -227,6 +261,9 @@ def main():
                              "where hashing would download every file")
     parser.add_argument("--hash-max-mb", type=float, default=512.0)
     parser.add_argument("--include-hidden", action="store_true")
+    parser.add_argument("--min-size-mb", type=float, default=0.0,
+                        help="ignore files smaller than this. Useful on folders full of tiny "
+                             "app-bundle files, where thousands of duplicates are worth nothing")
     parser.add_argument("--save", help="also write the report to this path")
     parser.add_argument("--json", action="store_true", help="print the raw analysis as JSON")
     parser.add_argument("--diagnose", action="store_true", help="report what is set up, then exit")
@@ -246,6 +283,7 @@ def main():
         if not isinstance(items, list) or any(not isinstance(i, dict) for i in items):
             sys.exit("Inventory must be a JSON list of objects. "
                      "For raw MCP output, run it through mcp_bridge.py first.")
+        items = apply_size_floor(items, args.min_size_mb)
         hashed = any("md5Checksum" in item for item in items)
         source = args.label or "Google Drive"
         text, data = report(Path(source), items, args.older_than_days, hashed, [],
@@ -274,6 +312,7 @@ def main():
         include_hidden=args.include_hidden,
         hash_files=hashed,
     )
+    items = apply_size_floor(items, args.min_size_mb)
     text, data = report(target, items, args.older_than_days, hashed, skipped)
     if args.json:
         print(json.dumps(data, indent=2, ensure_ascii=False))

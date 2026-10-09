@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+credentials.json
+token.json
+client_secret*.json
+drive-audit-report.json
+private-inventory*.json
+.DS_Store
+/inventory.json
+/report.json
+/skipped.json

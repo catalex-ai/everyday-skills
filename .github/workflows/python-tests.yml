@@ -1,0 +1,29 @@
+name: Python tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  drive-detox-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run tests
+        run: python -m unittest discover -s skills/drive-detox/tests -v
+      - name: Run sample analyzer
+        run: python skills/drive-detox/scripts/analyze_inventory.py skills/drive-detox/examples/inventory.json --older-than-days 730
+      - name: Local scan end to end
+        run: |
+          python skills/drive-detox/scripts/scan_local.py skills --output "$RUNNER_TEMP/inventory.json"
+          python skills/drive-detox/scripts/analyze_inventory.py "$RUNNER_TEMP/inventory.json" --older-than-days 730 --output "$RUNNER_TEMP/report.json"
+          python -c "import json,os,sys; r=json.load(open(os.environ['RUNNER_TEMP']+'/report.json')); sys.exit(0 if r['file_count']>0 else 'scan produced no files')"
+      - name: Guard against destructive calls in read-only scripts
+        run: |
+          if grep -nE "os\.remove|os\.unlink|os\.rmdir|shutil\.(move|rmtree)|\.unlink\(|\.rename\(|\.chmod\(|subprocess|os\.system" skills/drive-detox/scripts/*.py; then
+            echo "Destructive call found in a read-only skill script"
+            exit 1
+          fi

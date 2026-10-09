@@ -1,0 +1,26 @@
+[
+  {
+    "id": "example-001",
+    "name": "old-launch-video.mp4",
+    "mimeType": "video/mp4",
+    "size": "52428800",
+    "modifiedTime": "2021-02-14T09:00:00Z",
+    "md5Checksum": "sample-checksum",
+    "webViewLink": "https://drive.google.com/file/d/example-001/view"
+  },
+  {
+    "id": "example-002",
+    "name": "old-launch-video-copy.mp4",
+    "mimeType": "video/mp4",
+    "size": "52428800",
+    "modifiedTime": "2021-02-14T09:05:00Z",
+    "md5Checksum": "sample-checksum",
+    "webViewLink": "https://drive.google.com/file/d/example-002/view"
+  },
+  {
+    "id": "example-003",
+    "name": "Q3 planning.gdoc",
+    "mimeType": "application/vnd.google-apps.document",
+    "modifiedTime": "2026-08-01T12:00:00Z"
+  }
+]

@@ -1,0 +1,36 @@
+# CatalEx Everyday Skills
+
+**Small AI workflows. Real everyday outcomes.**
+
+An open-source collection of practical AI workflows for everyday life and work.
+
+## Skills
+| Skill | Outcome | Status |
+|---|---|---|
+| [Drive Detox](skills/drive-detox/README.md) | Audit a local folder or Google Drive read-only: biggest files, stale files, duplicate groups, and a cleanup plan you approve before anything moves. | Local mode works out of the box; Drive mode needs your own read-only MCP connection |
+
+## Getting started
+Read a skill's README for requirements and safety notes. To install Drive Detox into a Claude Code project:
+```bash
+mkdir -p .claude/skills
+cp -R skills/drive-detox .claude/skills/drive-detox
+```
+
+Try it without any setup:
+```bash
+python3 skills/drive-detox/scripts/scan_local.py ~/Downloads --output /tmp/inventory.json
+python3 skills/drive-detox/scripts/analyze_inventory.py /tmp/inventory.json --older-than-days 730
+```
+
+## Principles
+- Outcome-first: solve real problems.
+- Reusable: make workflows easy to inspect and adapt.
+- Transparent: document requirements, limitations, and permissions.
+- Safe by default: prefer least privilege.
+- Testable: include examples and tests where practical.
+
+## Add a skill
+Use [templates/skill-template](templates/skill-template) as the starting point. Each skill should have `SKILL.md`, `README.md`, examples, tests where applicable, and clear safety boundaries.
+
+## License
+MIT. See [LICENSE](LICENSE).

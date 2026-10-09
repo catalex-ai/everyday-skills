@@ -1,0 +1,12 @@
+{
+  "_comment": "Copy to .claude/settings.json in the project where you run Drive Detox. Replace google_drive with the server name as 'claude mcp list' prints it (lowercase, spaces and dashes as underscores). Denied tools cannot be called at all.",
+  "permissions": {
+    "deny": [
+      "mcp__google_drive__create_file",
+      "mcp__google_drive__copy_file",
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(trash:*)"
+    ]
+  }
+}

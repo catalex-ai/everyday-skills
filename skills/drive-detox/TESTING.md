@@ -1,5 +1,7 @@
 # Testing Drive Detox
 
+Not technical? Read [WALKTHROUGH.md](WALKTHROUGH.md) first — it covers the same ground more slowly, including opening Terminal and what each output should look like.
+
 No programming needed. Copy each block into Terminal and compare against the expected output.
 
 Everything below is read-only: the scripts open files to measure and checksum them, and never write inside the folder you point them at.
@@ -16,12 +18,12 @@ python3 -m unittest discover -s skills/drive-detox/tests -v
 Expect the last lines to read:
 
 ```
-Ran 14 tests in 0.0XXs
+Ran 30 tests in 0.0XXs
 
 OK
 ```
 
-`OK` means the duplicate detection, the age cutoff, the size handling, the symlink skipping, and the "scan changed nothing on disk" check all pass. Any `FAILED` line means stop and fix before sharing.
+`OK` means the duplicate detection, the age cutoff, the size handling, the symlink skipping, the Drive scope guard, and the "scan changed nothing on disk" check all pass. Any `FAILED` line means stop and fix before sharing.
 
 ## 2. The canned example (10 seconds)
 

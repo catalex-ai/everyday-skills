@@ -43,8 +43,14 @@ def should_skip_dir(name, excludes, include_hidden):
     return name.startswith(".") and not include_hidden
 
 
-def scan(root, hash_max_bytes=None, excludes=DEFAULT_EXCLUDES, include_hidden=False, follow_symlinks=False):
-    """Walk root and yield one metadata dict per regular file, plus skip notes."""
+def scan(root, hash_max_bytes=None, excludes=DEFAULT_EXCLUDES, include_hidden=False,
+         follow_symlinks=False, hash_files=True):
+    """Walk root and yield one metadata dict per regular file, plus skip notes.
+
+    hash_files=False reads no file contents at all, which matters on a cloud
+    mount like Google Drive for desktop in streaming mode, where opening a
+    placeholder would download it.
+    """
     root = Path(root).expanduser().resolve()
     if not root.is_dir():
         raise NotADirectoryError(f"not a directory: {root}")
@@ -76,7 +82,7 @@ def scan(root, hash_max_bytes=None, excludes=DEFAULT_EXCLUDES, include_hidden=Fa
                 "parentPath": str(full.parent),
                 "webViewLink": full.as_uri(),
             }
-            if hash_max_bytes is None or stat.st_size <= hash_max_bytes:
+            if hash_files and (hash_max_bytes is None or stat.st_size <= hash_max_bytes):
                 try:
                     record["md5Checksum"] = md5_of(full)
                 except OSError as exc:
@@ -91,6 +97,10 @@ def main():
     parser.add_argument("--output", type=Path, help="write inventory JSON here instead of stdout")
     parser.add_argument("--hash-max-mb", type=float, default=512.0,
                         help="skip checksums above this size; 0 means hash everything")
+    parser.add_argument("--no-hash", action="store_true",
+                        help="read no file contents at all. Use on a Google Drive for desktop "
+                             "mount in streaming mode, where hashing would download every file. "
+                             "Duplicate detection then falls back to same-name candidates only")
     parser.add_argument("--include-hidden", action="store_true")
     parser.add_argument("--follow-symlinks", action="store_true")
     parser.add_argument("--skip-report", type=Path, help="write the list of skipped paths here")
@@ -103,6 +113,7 @@ def main():
         hash_max_bytes=hash_max_bytes,
         include_hidden=args.include_hidden,
         follow_symlinks=args.follow_symlinks,
+        hash_files=not args.no_hash,
     )
     payload = json.dumps(items, indent=2, ensure_ascii=False)
     if args.output:

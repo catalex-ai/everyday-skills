@@ -70,5 +70,39 @@ class ScanLocalTests(unittest.TestCase):
             scan(self.root / "does-not-exist")
 
 
+class NoHashTests(unittest.TestCase):
+    """--no-hash must read no file contents, for cloud mounts that stream."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        (self.root / "a.txt").write_text("content", encoding="utf-8")
+        self.addCleanup(self.tmp.cleanup)
+
+    def test_no_checksums_when_hashing_is_off(self):
+        items, _ = scan(self.root, hash_files=False)
+        self.assertEqual(len(items), 1)
+        self.assertNotIn("md5Checksum", items[0])
+        self.assertEqual(items[0]["size"], str(len("content")))
+
+    def test_never_opens_a_file_when_hashing_is_off(self):
+        import builtins
+        opened = []
+        real_open = builtins.open
+
+        def spy(path, *args, **kwargs):
+            opened.append(str(path))
+            return real_open(path, *args, **kwargs)
+
+        builtins.open = spy
+        try:
+            scan(self.root, hash_files=False)
+        finally:
+            builtins.open = real_open
+        # mimetypes lazily reads the system MIME database; only the scanned
+        # folder matters here.
+        under_root = [path for path in opened if path.startswith(str(self.root))]
+        self.assertEqual(under_root, [])
+
 if __name__ == "__main__":
     unittest.main()

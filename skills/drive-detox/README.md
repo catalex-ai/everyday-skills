@@ -32,6 +32,8 @@ Open Claude Code in that project and ask for an audit, or invoke `/drive-detox`.
 
 Recommended: also copy [examples/claude-settings-readonly.json](examples/claude-settings-readonly.json) to `.claude/settings.json` so the write tools are denied at the permission layer, not just by the prompt. A denied tool cannot be called at all — Claude cannot even ask you to approve it.
 
+New to the terminal? Follow [WALKTHROUGH.md](WALKTHROUGH.md) instead — every command spelled out, in order, with what the output should look like.
+
 ## Try it in one minute
 
 ```bash
@@ -56,7 +58,7 @@ Write the inventory outside the repo — it lists your real file names.
 python3 -m unittest discover -s skills/drive-detox/tests -v
 ```
 
-28 tests. Full walkthrough, including how to prove the read-only claim yourself: [TESTING.md](TESTING.md).
+30 tests. Full walkthrough, including how to prove the read-only claim yourself: [TESTING.md](TESTING.md).
 
 ## Known limits
 

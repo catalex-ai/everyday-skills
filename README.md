@@ -7,7 +7,7 @@ An open-source collection of practical AI workflows for everyday life and work.
 ## Skills
 | Skill | Outcome | Status |
 |---|---|---|
-| [Drive Detox](skills/drive-detox/README.md) | Audit a local folder or Google Drive read-only: biggest files, stale files, duplicate groups, and a cleanup plan you approve before anything moves. | Local mode works out of the box; Drive mode needs your own read-only MCP connection |
+| [Drive Detox](skills/drive-detox/README.md) | Audit a local folder or Google Drive read-only: biggest files, stale files, duplicate groups, and a cleanup plan you approve before anything moves. | Local mode works out of the box; Drive mode needs a `drive.readonly` token or your own MCP connection |
 
 ## Getting started
 Read a skill's README for requirements and safety notes. To install Drive Detox into a Claude Code project:

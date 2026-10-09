@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "deny": [
+      "mcp__google_drive__create_file",
+      "mcp__google_drive__copy_file",
+      "mcp__claude_ai_Google_Drive__create_file",
+      "mcp__claude_ai_Google_Drive__copy_file"
+    ]
+  }
+}

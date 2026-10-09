@@ -10,7 +10,16 @@ First skill in CatalEx Everyday Skills.
 
 **Local mode** works right now, with no accounts and no setup. Point it at a folder.
 
-**Drive mode** audits Google Drive through a read-only Google Drive MCP server that you connect separately. This repo bundles no credentials and no Drive connection — see [references/google-drive-setup.md](references/google-drive-setup.md).
+**Drive mode** audits your real Google Drive, two ways: a `drive.readonly` access token you mint yourself, or a read-only Google Drive MCP server connected through claude.ai. This repo bundles no credentials and no Drive connection — see [references/google-drive-setup.md](references/google-drive-setup.md).
+
+```bash
+export GOOGLE_DRIVE_ACCESS_TOKEN="$(gcloud auth application-default print-access-token)"
+python3 skills/drive-detox/scripts/drive_inventory.py --check-scopes-only          # proves the token cannot write
+python3 skills/drive-detox/scripts/drive_inventory.py --output /tmp/drive.json
+python3 skills/drive-detox/scripts/analyze_inventory.py /tmp/drive.json --older-than-days 730
+```
+
+`drive_inventory.py` issues HTTP GET requests and nothing else, and it refuses to list a single file if the token carries any scope beyond read-only.
 
 ## Install into a project
 
@@ -21,7 +30,7 @@ cp -R skills/drive-detox .claude/skills/drive-detox
 
 Open Claude Code in that project and ask for an audit, or invoke `/drive-detox`.
 
-Recommended: also copy [examples/claude-settings-readonly.json](examples/claude-settings-readonly.json) to `.claude/settings.json` so the write tools are denied at the permission layer, not just by the prompt.
+Recommended: also copy [examples/claude-settings-readonly.json](examples/claude-settings-readonly.json) to `.claude/settings.json` so the write tools are denied at the permission layer, not just by the prompt. A denied tool cannot be called at all — Claude cannot even ask you to approve it.
 
 ## Try it in one minute
 
@@ -47,7 +56,7 @@ Write the inventory outside the repo — it lists your real file names.
 python3 -m unittest discover -s skills/drive-detox/tests -v
 ```
 
-14 tests. Full walkthrough, including how to prove the read-only claim yourself: [TESTING.md](TESTING.md).
+28 tests. Full walkthrough, including how to prove the read-only claim yourself: [TESTING.md](TESTING.md).
 
 ## Known limits
 

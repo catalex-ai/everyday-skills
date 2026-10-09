@@ -21,13 +21,25 @@ Three routes, easiest first:
 ## Install into a project
 
 ```bash
-mkdir -p .claude/skills
-cp -R skills/drive-detox .claude/skills/drive-detox
+./install.sh            # installs into ~/drive-detox
+./install.sh ~/folder   # or somewhere you choose
 ```
 
-Open Claude Code in that project and ask for an audit, or invoke `/drive-detox`.
+The installer copies the skill, installs the read-only settings and guard hook, proves the guard blocks a delete and a file write, and prints the two steps left. Then open Claude Code in that folder and ask for an audit, or invoke `/drive-detox`.
 
-Recommended: also copy [examples/claude-settings-readonly.json](examples/claude-settings-readonly.json) to `.claude/settings.json` so the write tools are denied at the permission layer, not just by the prompt. A denied tool cannot be called at all — Claude cannot even ask you to approve it.
+Lost? `python3 scripts/detox.py --setup` prints an ordered guide based on what is actually on your machine.
+
+## How read-only is enforced
+
+Not by the prompt. By [`hooks/readonly_guard.py`](hooks/readonly_guard.py), a PreToolUse hook the installer wires in:
+
+- `Write`, `Edit`, `NotebookEdit` and `MultiEdit` are blocked outright
+- every Bash command is blocked unless it matches an allow-list of read-only invocations
+- redirection, pipes, command chaining and command substitution are rejected, because `echo text > file` writes a file without naming a single write command — which is exactly how a deny-list of command names gets bypassed
+- `python3` may run only this skill's own scripts, never `-c` or `-m`
+- `--output`, `--save` and `--skip-report` must point inside `/tmp`, so an audit never writes next to the files it reads
+
+Tested live: asked to create a file by any means and then delete one, Claude was blocked at shell redirection, blocked again at the `Write` tool ("Write is disabled for this session, in subagents as well as here"), and blocked at `rm`. Nothing changed on disk. 28 tests cover the guard.
 
 Not technical? [WALKTHROUGH.md](WALKTHROUGH.md) is the short version: install once, then ask in plain English. You run three things, and only three, because nobody can do them for you — sign in to Google, approve an install, and decide what gets deleted.
 
@@ -58,7 +70,7 @@ It scans, analyzes, and prints a finished report. `--target auto` finds Google D
 python3 -m unittest discover -s skills/drive-detox/tests -v
 ```
 
-94 tests. Full walkthrough, including how to prove the read-only claim yourself: [TESTING.md](TESTING.md).
+116 tests. Full walkthrough, including how to prove the read-only claim yourself: [TESTING.md](TESTING.md).
 
 ## Known limits
 

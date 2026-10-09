@@ -211,5 +211,66 @@ class NoiseFilterTests(unittest.TestCase):
         self.assertIs(detox.apply_size_floor(items, 0), items)
 
 
+class ReclaimableTableTests(unittest.TestCase):
+    cutoff = "2024-10-09T00:00:00Z"
+
+    def buckets(self, items, duplicate_ids=frozenset()):
+        return detox.categorize(items, set(duplicate_ids), self.cutoff)
+
+    def test_each_file_lands_in_exactly_one_bucket(self):
+        items = [
+            item("dup", "clip 2.mov", 100, "2019-01-01T00:00:00Z"),
+            item("installer", "Docker.dmg", 200, "2019-01-01T00:00:00Z"),
+            item("stale", "old.pdf", 50, "2019-01-01T00:00:00Z", mime="application/pdf"),
+            item("fresh", "new.mov", 10, "2026-09-01T00:00:00Z"),
+        ]
+        buckets = self.buckets(items, {"dup"})
+        self.assertEqual([i["id"] for i in buckets["duplicate"]], ["dup"])
+        self.assertEqual([i["id"] for i in buckets["redownloadable"]], ["installer"])
+        self.assertEqual([i["id"] for i in buckets["stale"]], ["stale"])
+        self.assertEqual([i["id"] for i in buckets["keep"]], ["fresh"])
+        self.assertEqual(sum(len(v) for v in buckets.values()), len(items))
+
+    def test_duplicate_beats_installer_so_nothing_is_double_counted(self):
+        items = [item("x", "Claude (1).dmg", 100, "2019-01-01T00:00:00Z")]
+        buckets = self.buckets(items, {"x"})
+        self.assertEqual(len(buckets["duplicate"]), 1)
+        self.assertEqual(buckets["redownloadable"], [])
+
+    def test_recent_installer_is_still_reclaimable(self):
+        items = [item("x", "Docker.dmg", 100, "2026-09-01T00:00:00Z")]
+        self.assertEqual(len(self.buckets(items)["redownloadable"]), 1)
+
+    def test_table_is_ordered_by_space_and_skips_empty_categories(self):
+        items = [
+            item("i", "a.dmg", 500, "2026-01-01T00:00:00Z"),
+            item("d", "b.mov", 100, "2026-01-01T00:00:00Z"),
+        ]
+        table = detox.reclaimable_table(self.buckets(items, {"d"}), "2024-10-09")
+        self.assertEqual([row[0] for row in table],
+                         ["Installers you can download again", "Duplicate copies"])
+        self.assertEqual([row[2] for row in table], [500, 100])
+
+    def test_report_prints_the_table_with_a_total(self):
+        items = [
+            item("/d/a.dmg", "a.dmg", 1000, "2026-01-01T00:00:00Z"),
+            item("/d/b.mov", "b.mov", 500, "2020-01-01T00:00:00Z"),
+            item("/d/b 2.mov", "b 2.mov", 500, "2020-01-02T00:00:00Z"),
+        ]
+        for record in items[1:]:
+            record["md5Checksum"] = "same"
+        text, _ = detox.report(Path("/d"), items, 730, True, [])
+        self.assertIn("WHAT YOU CAN RECLAIM", text)
+        self.assertIn("Installers you can download again", text)
+        self.assertIn("Duplicate copies", text)
+        self.assertIn("Total if you act on all of it", text)
+        self.assertIn("Keeping", text)
+
+    def test_report_says_so_when_there_is_nothing_to_reclaim(self):
+        items = [item("/d/a.mov", "a.mov", 10, "2026-09-01T00:00:00Z")]
+        text, _ = detox.report(Path("/d"), items, 730, True, [])
+        self.assertIn("Nothing stands out", text)
+
+
 if __name__ == "__main__":
     unittest.main()

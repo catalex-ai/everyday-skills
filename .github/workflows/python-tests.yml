@@ -39,6 +39,28 @@ jobs:
           fi
       - name: Deny-rule checker passes on the shipped settings
         run: python skills/drive-detox/scripts/check_deny_rules.py --server google_drive --settings .claude/settings.json
+      - name: Installer works end to end
+        run: |
+          ./install.sh "$RUNNER_TEMP/detox-install"
+          test -f "$RUNNER_TEMP/detox-install/.claude/settings.json"
+          test -f "$RUNNER_TEMP/detox-install/.claude/skills/drive-detox/hooks/readonly_guard.py"
+      - name: Read-only guard blocks the obvious bypasses
+        run: |
+          set -e
+          guard=skills/drive-detox/hooks/readonly_guard.py
+          for payload in \
+            '{"tool_name":"Write","tool_input":{"file_path":"/tmp/x","content":"y"}}' \
+            '{"tool_name":"Bash","tool_input":{"command":"echo hi > f.txt"}}' \
+            '{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}' \
+            '{"tool_name":"Bash","tool_input":{"command":"python3 -c pass"}}' ; do
+            if printf '%s\n' "$payload" | python "$guard" 2>/dev/null; then
+              echo "Guard allowed: $payload"; exit 1
+            fi
+          done
+          printf '%s\n' '{"tool_name":"Bash","tool_input":{"command":"python3 scripts/detox.py --target ."}}' \
+            | python "$guard"
+      - name: Guided setup runs
+        run: python skills/drive-detox/scripts/detox.py --setup
       - name: Guard against destructive calls in read-only scripts
         run: |
           if grep -nE "os\.remove|os\.unlink|os\.rmdir|shutil\.(move|rmtree)|\.unlink\(|\.rename\(|\.chmod\(|subprocess|os\.system" skills/drive-detox/scripts/*.py; then

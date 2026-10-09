@@ -84,7 +84,7 @@ cd ~/Downloads/everyday-skills
 python3 -m unittest discover -s skills/drive-detox/tests
 ```
 
-The last lines should read `Ran 94 tests` and `OK`. That includes a test that scans a folder and then proves nothing in it changed, a test that proves no file is opened when hashing is off, tests proving the Drive code refuses a credential that could write, and tests for the Drive-over-MCP path that run without any Drive connection.
+The last lines should read `Ran 116 tests` and `OK`. That includes a test that scans a folder and then proves nothing in it changed, a test that proves no file is opened when hashing is off, tests proving the Drive code refuses a credential that could write, and tests for the Drive-over-MCP path that run without any Drive connection.
 
 ### 2. The refusal
 

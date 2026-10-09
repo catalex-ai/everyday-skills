@@ -54,6 +54,62 @@ def resolve_target(requested):
     )
 
 
+def guard_active():
+    """Is the read-only hook wired into this project's settings?"""
+    settings = Path(".claude/settings.json")
+    if not settings.is_file():
+        return None
+    try:
+        data = json.loads(settings.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    text = json.dumps(data.get("hooks", {}))
+    return "readonly_guard.py" in text
+
+
+def setup():
+    """Print a short, ordered guide based on what is actually on this machine."""
+    mounts = find_drive_mounts()
+    guard = guard_active()
+    print("Drive Detox — what to do next\n")
+
+    print("1. Audit a folder on this Mac")
+    print("   Ready now. In Claude, say:  clean up my Downloads folder")
+    print("   Or run:  python3 scripts/detox.py --target ~/Downloads\n")
+
+    print("2. Audit your Google Drive")
+    if mounts:
+        for mount in mounts:
+            print(f"   Ready now, found at {mount}")
+        print("   In Claude, say:  audit my Google Drive\n")
+    else:
+        print("   Not set up yet. Easiest route, about two minutes:")
+        print("     a. Install Google Drive for desktop:")
+        print("        brew install --cask google-drive")
+        print("        or download it from https://www.google.com/drive/download/")
+        print("     b. Open it, sign in, and choose 'Stream files' when asked.")
+        print("     c. Come back and say:  audit my Google Drive")
+        print("   Checksum-exact duplicates across a whole Drive instead need a")
+        print("   free Google Cloud project: see references/google-drive-setup.md\n")
+
+    print("3. Read-only protection")
+    if guard is True:
+        print("   Active. The guard hook blocks writes, deletes and redirection.")
+    elif guard is False:
+        print("   A settings file exists but the guard hook is not in it.")
+        print("   Copy examples/claude-settings-readonly.json to .claude/settings.json")
+    else:
+        print("   No .claude/settings.json here, so you are probably in the wrong")
+        print("   folder, or the skill was copied without it. Re-run ./install.sh")
+    print("   Verify it yourself:")
+    print("     python3 -m unittest discover -s tests\n")
+
+    token = os.environ.get("GOOGLE_DRIVE_ACCESS_TOKEN")
+    if token:
+        print("4. A Drive API token is set. Check what it can do before using it:")
+        print("     python3 scripts/drive_inventory.py --check-scopes-only")
+
+
 def diagnose():
     """Report what is available, so setup questions are answered by facts."""
     print("Drive Detox setup check")
@@ -125,6 +181,45 @@ def display(path, item):
         return str(Path(identity).relative_to(path))
     except (ValueError, TypeError):
         return item.get("name") or identity
+
+
+# Files a person can simply download again, so they are the safest thing to drop.
+REDOWNLOADABLE = (".dmg", ".pkg", ".iso", ".exe", ".msi", ".deb", ".rpm", ".appimage")
+
+
+def categorize(items, duplicate_ids, cutoff_iso):
+    """Put each file in exactly one bucket, so nothing is counted twice."""
+    buckets = {"duplicate": [], "redownloadable": [], "stale": [], "keep": []}
+    for item in items:
+        name = str(item.get("name") or "").lower()
+        modified = item.get("modifiedTime") or ""
+        if item.get("id") in duplicate_ids:
+            buckets["duplicate"].append(item)
+        elif name.endswith(REDOWNLOADABLE):
+            buckets["redownloadable"].append(item)
+        elif modified and modified < cutoff_iso:
+            buckets["stale"].append(item)
+        else:
+            buckets["keep"].append(item)
+    return buckets
+
+
+def bucket_bytes(items):
+    return sum(size for size in (parse_size(i.get("size")) for i in items) if size)
+
+
+def reclaimable_table(buckets, cutoff_date):
+    """Rows of (label, files, bytes, verdict), biggest payoff first."""
+    rows = [
+        ("Duplicate copies", buckets["duplicate"], "safe — identical contents"),
+        ("Installers you can download again", buckets["redownloadable"],
+         "safe — re-downloadable"),
+        (f"Untouched since {cutoff_date}", buckets["stale"], "review each one first"),
+    ]
+    table = [(label, len(items), bucket_bytes(items), verdict)
+             for label, items, verdict in rows if items]
+    table.sort(key=lambda row: -row[2])
+    return table
 
 
 def apply_size_floor(items, min_size_mb):
@@ -225,14 +320,21 @@ def report(target, items, older_than_days, hashed, skipped, contents_read=True):
         out(f"  ... and {len(stale) - 5} more")
     out("")
 
-    tally = {}
-    for item in items:
-        tally[label(item, cutoff_iso, duplicate_ids)] = tally.get(
-            label(item, cutoff_iso, duplicate_ids), 0) + 1
-    out("RECOMMENDATION")
-    for name in ("DUPLICATE CANDIDATE", "ARCHIVE CANDIDATE", "REVIEW", "KEEP"):
-        if tally.get(name):
-            out(f"  {name:<22} {plural(tally[name], 'file'):>12}")
+    buckets = categorize(items, duplicate_ids, cutoff_iso)
+    table = reclaimable_table(buckets, cutoff.date())
+    out("WHAT YOU CAN RECLAIM")
+    if table:
+        out(f"  {'':<36}{'Files':>7}{'Space':>11}   Safe to remove?")
+        for label_text, count, size, verdict in table:
+            out(f"  {label_text:<36}{count:>7,}{human_size(size):>11}   {verdict}")
+        out(f"  {'-' * 71}")
+        total_files = sum(row[1] for row in table)
+        total_bytes = sum(row[2] for row in table)
+        out(f"  {'Total if you act on all of it':<36}{total_files:>7,}{human_size(total_bytes):>11}")
+        out(f"  {'Keeping':<36}{len(buckets['keep']):>7,}"
+            f"{human_size(bucket_bytes(buckets['keep'])):>11}")
+    else:
+        out("  Nothing stands out. No duplicates, no installers, nothing stale.")
     out("")
     if not contents_read:
         out("Nothing was changed. Only metadata was read: no file was downloaded, "
@@ -267,8 +369,13 @@ def main():
     parser.add_argument("--save", help="also write the report to this path")
     parser.add_argument("--json", action="store_true", help="print the raw analysis as JSON")
     parser.add_argument("--diagnose", action="store_true", help="report what is set up, then exit")
+    parser.add_argument("--setup", action="store_true",
+                        help="walk through what is ready and what to do next, then exit")
     args = parser.parse_args()
 
+    if args.setup:
+        setup()
+        return
     if args.diagnose:
         diagnose()
         return

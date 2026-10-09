@@ -1,12 +1,45 @@
 {
-  "_comment": "Copy to .claude/settings.json in the project where you run Drive Detox. Replace google_drive with the server name as 'claude mcp list' prints it (lowercase, spaces and dashes as underscores). Denied tools cannot be called at all.",
+  "_comment": "Copy to .claude/settings.json in the project you run Drive Detox from. The hook is the real boundary: it allows only the skill's read-only scripts and blocks everything else, including shell redirection. The deny list below is a second layer. Replace google_drive with the server name as 'claude mcp list' prints it, keeping its capitals and dashes.",
   "permissions": {
     "deny": [
+      "Write",
+      "Edit",
+      "NotebookEdit",
+      "Bash(rm:*)",
+      "Bash(rmdir:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)",
+      "Bash(trash:*)",
+      "Bash(touch:*)",
+      "Bash(mkdir:*)",
+      "Bash(ln:*)",
+      "Bash(dd:*)",
+      "Bash(tee:*)",
+      "Bash(truncate:*)",
+      "Bash(chmod:*)",
+      "Bash(chown:*)",
+      "Bash(rsync:*)",
+      "Bash(ditto:*)",
+      "Bash(sed:*)",
+      "Bash(osascript:*)",
       "mcp__google_drive__create_file",
       "mcp__google_drive__copy_file",
-      "Bash(rm:*)",
-      "Bash(mv:*)",
-      "Bash(trash:*)"
+      "mcp__claude_ai_Google_Drive__create_file",
+      "mcp__claude_ai_Google_Drive__copy_file"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|NotebookEdit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/skills/drive-detox/hooks/readonly_guard.py",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

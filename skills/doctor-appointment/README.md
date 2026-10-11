@@ -32,6 +32,26 @@ It links your existing protected native Codex auth file into the two isolated
 run `CODEX_HOME="$PWD/.codex" codex login` in each role folder. Native Claude uses
 its existing login. No Google credentials are needed for practice.
 
+## Open an assistant
+
+After the one-time preparation, double-click **Patient Assistant.command** or
+**Doctor Assistant.command** in Finder. These open native Codex with the tested
+restrictions. The shortcuts use your login shell's PATH to locate the CLI.
+
+From a terminal, the same minimal entry point supports either runtime:
+
+```sh
+./doctor-assistant/start.sh patient
+./doctor-assistant/start.sh doctor
+./doctor-assistant/start.sh patient claude
+./doctor-assistant/start.sh doctor claude
+```
+
+The shortcuts only select the folder and pass the existing restricted native CLI
+options. They do not install dependencies, authenticate Google, or change policy.
+If macOS blocks a downloaded shortcut, review it and use Finder's Open action;
+terminal invocation remains available. Missing CLIs fail without a fallback.
+
 ## Codex: two native terminals
 
 Terminal 1, from your workspace root:

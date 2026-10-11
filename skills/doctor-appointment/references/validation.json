@@ -1,5 +1,5 @@
 {
-  "version": "0.2.1",
+  "version": "0.2.2",
   "tested_at": "2026-10-11T13:56:48.987935+00:00",
   "tests": {
     "doctor_appointment": {
@@ -11,7 +11,8 @@
       "failed": 0
     },
     "skill_validation": "passed",
-    "offline_smoke": "passed"
+    "offline_smoke": "passed",
+    "shortcut_entrypoints": "passed: both roles/runtimes, spaced paths, exact flags and invalid input"
   },
   "runtime_audit": {
     "time": "2026-10-11T13:50:16.394681+00:00",
@@ -273,11 +274,13 @@
   "google_live_verified": false,
   "files": {
     ".gitignore": "692dc9ef4b7ce4d463c19399359d6ec80ba87d44506d404b366490d80c4ca26e",
+    "Doctor Assistant.command": "578f03b8852e717f65817466c101075e5cec5e69936f4a52b294eafaaf4e3c10",
     "GATEWAY.md": "e3791e5f21b6c5c47b79be74e62e4f3b79754d9b354346a873413a376dce17e3",
     "PRIVACY.md": "38171e5340673d3f0d93fe6c1b1fb6cf62606aa8426001a186611c037ba4f1f6",
-    "README.md": "da039190dff4d06405e4621551a195faf482d0f8270965bdd5efaef339d680fb",
+    "Patient Assistant.command": "0f6d9fc43442205006019ce9ba52ba07e47538478e17f43216de6c4e11922e54",
+    "README.md": "982074d460642a69aa332634e810ce72420a9ce9ce3e02180174b595bec173f4",
     "SECURITY.md": "c35ace8472a27ef7d71b8c951aefdc04f74b0e502edbc65b15825b5145567e6b",
-    "SKILL.md": "c5df6414e28086eb3c84801c083c3a23b8f2d79702d9558f15938a53103db274",
+    "SKILL.md": "89044558a0534e46acb76a65a8b0a3fcbd0138bcbc52375ff5c032b10590275c",
     "TESTING.md": "20defe6344016a799163825164ec2179b115f399537933cdd781919767e49c79",
     "agents/openai.yaml": "5327bc3e3c27b2dde5c2b7486ec2fdb0f8b4c3a878b82f2d0260c5d52329d5ca",
     "config/clinic.example.json": "07a1a904520b04c5ae68a7210c44c2b79b335e5546b137c754163b13ba6a85b0",
@@ -300,6 +303,7 @@
     "requirements.lock.txt": "1dc25320144415bdd46885647dec8d3d19b34a6e41ac93ee8cb1d5c33d3e1ae3",
     "requirements.txt": "9a51ae3dbcbd7b051abe42a46244254e5d6d2c4ce1b80299beebd5671e002c63",
     "scripts/verify_package.py": "f56f48291637e80dc5f6fdeb2d5f468748056917c82c6cb0b5beb363fbe78e49",
+    "start.sh": "72b5dd433dafe086c33c1fb3056e034a9abbf7869c3f93ac9d41f335f275798a",
     "tests/run_native_sessions.py": "bb68acb705f60578236cad393c83d240a27f55d867df11687e687a5691683b0c",
     "tests/test_adapters.py": "9f4fda461a00ac0ab7046cfe905ba82bd7c306a6d28ee1999553055e5b6556d4",
     "tests/test_security.py": "63a9f30bb81165986aed2803be5f11ea6fe5b4ee6648d613dc218338f4e863d6",

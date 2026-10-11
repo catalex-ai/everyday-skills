@@ -43,8 +43,9 @@ Resolve paths against `PACKAGE`; preserve unrelated files and configuration.
    expose only its clinic MCP methods. Use the exact commands in README.
 
 Codex discovers `AGENTS.md`, `.agents/skills`, and the isolated `.codex/config.toml`.
-Claude discovers `CLAUDE.md` (which imports AGENTS.md), `.claude/skills`, native
-settings and `.mcp.json`. There is no `launch.py`, application or installer.
+Claude uses native `--append-system-prompt-file AGENTS.md` and `--plugin-dir .claude`
+to explicitly load instructions and its namespaced role skill alongside native
+settings and `.mcp.json`. Restricted auto-discovery on the tested build omitted them. There is no `launch.py`, application or installer.
 Native flags and a scoped Codex home are required to avoid inheriting unrestricted
 user settings/tools; merely opening a folder and typing a bare CLI name is not
 proof of isolation. Never relax restrictions to fix failed setup.

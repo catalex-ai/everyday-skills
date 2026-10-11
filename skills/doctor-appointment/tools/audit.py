@@ -24,9 +24,11 @@ def inventory(stream,role):
         for block in message.get('message',{}).get('content',[]):
             if isinstance(block,dict) and block.get('type')=='tool_use':calls.append(block.get('name'))
             if isinstance(block,dict) and block.get('type')=='tool_result':results.append(bool(block.get('is_error',False)))
+    role_skill='clinic-role:'+('appointments' if role=='patient' else 'clinic')
+    skill_discovered=role_skill in init.get('skills',[])
     clinic_call=any(name and name.startswith('mcp__clinic__') for name in calls)
     connected=bool(init.get('mcp_servers')) and all(s.get('status')=='connected' for s in init['mcp_servers'])
-    return {'status':'passed' if not extra and not missing and connected and clinic_call and not any(results) else 'failed','actual_tools':sorted(actual),'unexpected_tools':sorted(extra),'missing_tools':sorted(missing),'mcp_connected':connected,'observed_tool_calls':calls,'clinic_call_observed':clinic_call,'tool_error_observed':any(results)}
+    return {'status':'passed' if not extra and not missing and connected and clinic_call and skill_discovered and not any(results) else 'failed','role_skill_discovered':skill_discovered,'native_skills':init.get('skills',[]),'actual_tools':sorted(actual),'unexpected_tools':sorted(extra),'missing_tools':sorted(missing),'mcp_connected':connected,'observed_tool_calls':calls,'clinic_call_observed':clinic_call,'tool_error_observed':any(results)}
 
 class RPC:
     def __init__(self,role,root=ROOT):
@@ -95,7 +97,7 @@ def codex_audit(role):
 
 def claude_audit(role):
     folder=ROOT/(role+'-agent')
-    command=['claude','--restricted','--tools','Skill','--strict-mcp-config','--mcp-config','.mcp.json','--setting-sources','','--settings','.claude/settings.json','--permission-mode','dontAsk','--no-chrome','-p','--output-format','stream-json','--verbose','Use your role-specific skill and show '+('my appointments' if role=='patient' else 'the clinic connection status')+'. Do not modify appointments or files.']
+    command=['claude','--restricted','--tools','Skill','--strict-mcp-config','--mcp-config','.mcp.json','--setting-sources','','--plugin-dir','.claude','--append-system-prompt-file','AGENTS.md','--settings','.claude/settings.json','--permission-mode','dontAsk','--no-chrome','-p','--output-format','stream-json','--verbose','Invoke the clinic-role:'+('appointments' if role=='patient' else 'clinic')+' skill and show '+('my appointments' if role=='patient' else 'the clinic connection status')+'. Do not modify appointments or files.']
     run=subprocess.run(command,cwd=folder,env=environment(role),capture_output=True,text=True,timeout=55)
     result=inventory(run.stdout,role);result['exit_code']=run.returncode
     if run.returncode:result['status']='unverified'

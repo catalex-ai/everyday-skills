@@ -5,7 +5,7 @@ from core import PATIENT,DOCTOR
 def decide(role,event):
     names={'mcp__clinic__'+x for x in (PATIENT if role=='patient' else DOCTOR if role=='doctor' else set())}
     if event.get('tool_name')=='Skill':
-        return event.get('tool_input',{}).get('skill')==('appointments' if role=='patient' else 'clinic')
+        return event.get('tool_input',{}).get('skill')in {('appointments' if role=='patient' else 'clinic'), 'clinic-role:'+('appointments' if role=='patient' else 'clinic')}
     return event.get('tool_name') in names
 
 def main():

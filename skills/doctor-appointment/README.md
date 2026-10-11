@@ -78,10 +78,10 @@ This explicit local test identity is not authentication for live patients.
 In either role folder, run this native command:
 
 ```sh
-claude --restricted --tools Skill --strict-mcp-config --mcp-config .mcp.json --setting-sources "" --settings .claude/settings.json --permission-mode dontAsk --no-chrome
+claude --restricted --tools Skill --strict-mcp-config --mcp-config .mcp.json --setting-sources "" --plugin-dir .claude --append-system-prompt-file AGENTS.md --settings .claude/settings.json --permission-mode dontAsk --no-chrome
 ```
 
-Claude imports `AGENTS.md` via `CLAUDE.md` and discovers `.claude/skills`.
+Claude receives `AGENTS.md` through its native prompt-file flag and loads the role skill through the explicitly selected local `.claude` plugin. `CLAUDE.md` also imports AGENTS.md for ordinary native discovery. Restricted-mode auto-discovery did not load project instructions/skills on the tested build; explicit native flags are required.
 Only the role's skill and clinic MCP operations are authorized. Shell/file/web
 built-ins are removed, hooks allow only that role's tools, and the fail-closed
 Bash sandbox cannot retry outside its boundary. Native skills are used directly.

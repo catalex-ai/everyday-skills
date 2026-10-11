@@ -9,7 +9,7 @@
       "mcp__clinic__get_clinic_information",
       "mcp__clinic__get_my_appointments",
       "mcp__clinic__reschedule_my_appointment",
-      "Skill(appointments)"
+      "Skill(clinic-role:appointments)"
     ],
     "deny": [
       "Bash",

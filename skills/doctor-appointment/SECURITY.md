@@ -36,7 +36,7 @@ approval, including direct calls. Its sandboxed Code Mode orchestrates exposed
 tools and is not an arbitrary Python/shell/filesystem interface. The audit does
 not enumerate the complete built-in schema; this remains explicitly unverified.
 
-Claude natively loads CLAUDE.md (importing AGENTS.md), its skill and native settings.
+Claude explicitly loads AGENTS.md with its native prompt-file flag and its role skill with the local plugin flag. Restricted project auto-discovery omitted both on the tested build; the audit now checks the actual namespaced skill inventory.
 The documented `--restricted --tools Skill --strict-mcp-config` command removes
 shell/file/web built-ins and restricts MCP to `.mcp.json`. Only the role's Skill
 invocation is allowed by permissions and the trusted hook. Settings are supplied

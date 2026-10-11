@@ -1,6 +1,6 @@
 {
-  "version": "0.2.0",
-  "tested_at": "2026-10-11T13:50:16.394681+00:00",
+  "version": "0.2.1",
+  "tested_at": "2026-10-11T13:56:48.987935+00:00",
   "tests": {
     "doctor_appointment": {
       "passed": 59,
@@ -157,6 +157,29 @@
         "sessions": {
           "patient": {
             "status": "passed",
+            "role_skill_discovered": true,
+            "native_skills": [
+              "deep-research",
+              "clinic-role:appointments",
+              "design",
+              "design-sync",
+              "dataviz",
+              "update-config",
+              "verify",
+              "debug",
+              "code-review",
+              "simplify",
+              "batch",
+              "fewer-permission-prompts",
+              "doctor",
+              "loop",
+              "schedule",
+              "claude-api",
+              "workflow-authoring",
+              "run",
+              "run-skill-generator",
+              "plugin-authoring"
+            ],
             "actual_tools": [
               "Skill",
               "mcp__clinic__book_my_appointment",
@@ -170,6 +193,7 @@
             "missing_tools": [],
             "mcp_connected": true,
             "observed_tool_calls": [
+              "Skill",
               "mcp__clinic__get_my_appointments"
             ],
             "clinic_call_observed": true,
@@ -178,6 +202,29 @@
           },
           "doctor": {
             "status": "passed",
+            "role_skill_discovered": true,
+            "native_skills": [
+              "deep-research",
+              "clinic-role:clinic",
+              "design",
+              "design-sync",
+              "dataviz",
+              "update-config",
+              "verify",
+              "debug",
+              "code-review",
+              "simplify",
+              "batch",
+              "fewer-permission-prompts",
+              "doctor",
+              "loop",
+              "schedule",
+              "claude-api",
+              "workflow-authoring",
+              "run",
+              "run-skill-generator",
+              "plugin-authoring"
+            ],
             "actual_tools": [
               "Skill",
               "mcp__clinic__doctor_block_time",
@@ -199,6 +246,7 @@
             "missing_tools": [],
             "mcp_connected": true,
             "observed_tool_calls": [
+              "Skill",
               "mcp__clinic__doctor_connection_status"
             ],
             "clinic_call_observed": true,
@@ -227,21 +275,23 @@
     ".gitignore": "692dc9ef4b7ce4d463c19399359d6ec80ba87d44506d404b366490d80c4ca26e",
     "GATEWAY.md": "e3791e5f21b6c5c47b79be74e62e4f3b79754d9b354346a873413a376dce17e3",
     "PRIVACY.md": "38171e5340673d3f0d93fe6c1b1fb6cf62606aa8426001a186611c037ba4f1f6",
-    "README.md": "0a525a27e4bb50af486b3d9eb5f4d647bb01445573619cc705c7e148e84dcea8",
-    "SECURITY.md": "a88ee289040b665f569f8cbe7cbe356098a07222e487b2bb99c2d795c192ba1e",
-    "SKILL.md": "e1f35aaf54236c61bf98324c96edc007ab8ccb39852c657067e8bc089c8e5045",
-    "TESTING.md": "d854424a03512e1f2089e18ae8bc7c1457414868fbebbe48d4b620ad074153c0",
+    "README.md": "da039190dff4d06405e4621551a195faf482d0f8270965bdd5efaef339d680fb",
+    "SECURITY.md": "c35ace8472a27ef7d71b8c951aefdc04f74b0e502edbc65b15825b5145567e6b",
+    "SKILL.md": "c5df6414e28086eb3c84801c083c3a23b8f2d79702d9558f15938a53103db274",
+    "TESTING.md": "20defe6344016a799163825164ec2179b115f399537933cdd781919767e49c79",
     "agents/openai.yaml": "5327bc3e3c27b2dde5c2b7486ec2fdb0f8b4c3a878b82f2d0260c5d52329d5ca",
     "config/clinic.example.json": "07a1a904520b04c5ae68a7210c44c2b79b335e5546b137c754163b13ba6a85b0",
     "doctor-agent/.agents/skills/clinic/SKILL.md": "3b6b0fa66dee39ba3ba731494f404f8304eb9c2ccb4e5225b84a2ad0a8ee63e8",
-    "doctor-agent/.claude/settings.json": "6e96fc6260a760cd0778275e64a10d14558c080bbfb0ebf1dfea052d2f11229c",
+    "doctor-agent/.claude/.claude-plugin/plugin.json": "9925e36e3fef0a66304379f464c9756386db6c3a19e4f13f86c11a4d1ce5c076",
+    "doctor-agent/.claude/settings.json": "1029b123549a88f6b160bc3bb18fcde777cb56ddbac198d8cbec2919a01916bd",
     "doctor-agent/.claude/skills/clinic/SKILL.md": "3b6b0fa66dee39ba3ba731494f404f8304eb9c2ccb4e5225b84a2ad0a8ee63e8",
     "doctor-agent/.codex/config.toml": "05869d82da6dc3e30eaf888a77ff52b4c9a098dd7061092359dd9478652780d4",
     "doctor-agent/.mcp.json": "4bcca5eeb1c003ff3a9f0835348df02c044167f810c7c55e21b50ce529024d25",
     "doctor-agent/AGENTS.md": "c6bcff3bd3fa4dc20a6da55a42ff173bf84987919373e92440b9e1b6d123df38",
     "doctor-agent/CLAUDE.md": "336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49",
     "patient-agent/.agents/skills/appointments/SKILL.md": "54f00bb455585fd01f1f04e0fcdfc583d4c59490065c11a595e7c4bc9fbb6431",
-    "patient-agent/.claude/settings.json": "7fd8fd1873b7308b35b2582ee578142d920d7ab5522c17def4b783df6bda26c2",
+    "patient-agent/.claude/.claude-plugin/plugin.json": "9925e36e3fef0a66304379f464c9756386db6c3a19e4f13f86c11a4d1ce5c076",
+    "patient-agent/.claude/settings.json": "d0eb370dbfc96f756b541049712a370db856eaa91bd4654f2844e490aa371ed9",
     "patient-agent/.claude/skills/appointments/SKILL.md": "54f00bb455585fd01f1f04e0fcdfc583d4c59490065c11a595e7c4bc9fbb6431",
     "patient-agent/.codex/config.toml": "2b581e017eb36b29f81e89da19f1fe26f85f893fab5427dbd1754740ad8aeb9f",
     "patient-agent/.mcp.json": "9e21a4ce9776295fd4d2127b1d8a7476b020ab9e9c5e3623eb60b057befefc28",
@@ -254,13 +304,18 @@
     "tests/test_adapters.py": "9f4fda461a00ac0ab7046cfe905ba82bd7c306a6d28ee1999553055e5b6556d4",
     "tests/test_security.py": "63a9f30bb81165986aed2803be5f11ea6fe5b4ee6648d613dc218338f4e863d6",
     "tools/admin.py": "c6e6bbbb643cf4804df6b188317fb73af3d64e22a3f378d29c8481de3847cf52",
-    "tools/audit.py": "f13cd264579b532eb7eea92561de49e62e404fa87183843a4fcb1c6772ea9e80",
+    "tools/audit.py": "d8b6721da19ff9c81146b155fd58c3820eef1dbfdb678cb61115764cdfddce00",
     "tools/core.py": "8a78ac5960b111eed39c19e78de78d09c2576bab09aef94997477ad15050b81f",
     "tools/google_adapter.py": "4d41976517bbbc614cadfad32c861492bfa1f0cf23a18150c8ea29ba894c98de",
     "tools/mock.py": "119477cf6f1d8e06a93604769f1d1daa8c5be4cdb0e0a1582082775a096d6d68",
     "tools/server.py": "9d4425f67a3c886005bef4310467c540a0d470b88c3c06fc28666716caf617e7",
     "tools/smoke.py": "030288321eeef95981bfd3e6bb7be74fc91c847038b186051405032087345287",
-    "tools/tool_guard.py": "71a564acad8d5d9f70ebb13c536124ea74b23b9785e81e3e2bd9386c793b1088",
+    "tools/tool_guard.py": "389c2e63ea276aff9087063f9363f9dcd03f82bc3542786d75d206ca6fd18da7",
     "tools/verification.py": "36b5bf6d67b71d8e6590f35169a28e729bb3889bab6e1dfba2c6b47930a3b920"
+  },
+  "fresh_consumer": {
+    "codex_native_bookings": "passed",
+    "patient_isolation": "passed",
+    "claude_discovery_defect": "fixed with explicit native plugin and prompt-file flags; role Skill calls observed"
   }
 }

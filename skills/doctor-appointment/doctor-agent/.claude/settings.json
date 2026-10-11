@@ -17,7 +17,7 @@
       "mcp__clinic__doctor_sync_status",
       "mcp__clinic__doctor_unblock_time",
       "mcp__clinic__doctor_verify_synthetic_appointment",
-      "Skill(clinic)"
+      "Skill(clinic-role:clinic)"
     ],
     "deny": [
       "Bash",

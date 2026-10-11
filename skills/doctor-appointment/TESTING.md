@@ -1,4 +1,4 @@
-# Version 0.2.0 verification
+# Version 0.2.1 verification
 
 This release uses native Codex and Claude instructions/skills/configuration. It
 removes `launch.py` and adds doctor-side booking through the shared scheduler.
@@ -42,3 +42,5 @@ A fresh-folder subagent evaluates the pinned public skill after publication,
 verifies the downloaded bundle, discovers native role skills/config, and exercises
 actual synthetic Codex sessions. No source/receipt edits or full-suite rerun are
 needed. The maintainer handoff records the fresh evaluation result.
+
+Fresh consumer testing caught missing Claude restricted-mode skill discovery. Version 0.2.1 explicitly loads the local role plugin and AGENTS prompt file; the audit requires the actual namespaced role skill. No custom session wrapper is used.

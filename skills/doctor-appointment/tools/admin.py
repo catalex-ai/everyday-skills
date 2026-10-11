@@ -118,7 +118,7 @@ def main():
     if a.operation=='google-revoke':print(json.dumps(revoke()));return
     c=validate_config(json.loads(config_path.read_text())) if config_path.exists() else dict(DEFAULT)
     cal=a.calendar_id or c['calendar_id'];sheet=a.spreadsheet_id or c['spreadsheet_id']
-    if not cal or not sheet:raise ValueError('Run google-configure to select explicit calendar and spreadsheet IDs')
+    if not cal or not sheet:raise ValueError('Google is not configured. Run google-setup --client PATH to choose a writable calendar and create a register or paste an existing Google Sheets URL.')
     if a.operation=='google-connect':
         if not a.client or not a.client.is_file():raise ValueError('Provide --client pointing to downloaded Desktop OAuth client JSON outside repository')
         print('Human terminal OAuth operation. No secrets are returned to the model.');print(json.dumps(connect(a.client,cal,sheet)));return

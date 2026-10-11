@@ -95,6 +95,13 @@ class OAuthSetupTests(unittest.TestCase):
             with self.assertRaises(SystemExit):admin.run()
         self.assertFalse(any(e[0]=='authorize' for e in self.events))
 
+    def test_missing_configuration_guides_operator_to_google_setup(self):
+        with patch.object(sys,'argv',['admin.py','google-status']),contextlib.redirect_stderr(io.StringIO()) as err:
+            with self.assertRaises(SystemExit):admin.run()
+        self.assertIn('google-setup --client PATH',err.getvalue())
+        self.assertIn('existing Google Sheets URL',err.getvalue())
+        self.assertNotIn('google-configure',err.getvalue())
+
     def test_package_client_path_rejected_before_oauth(self):
         inside=self.root/'client.json';inside.write_text('{}')
         with patch.object(sys,'argv',['admin.py','google-setup','--client',str(inside)]),contextlib.redirect_stderr(io.StringIO()):

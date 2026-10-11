@@ -22,6 +22,27 @@ PACKAGE = Path(__file__).resolve().parents[1]
 SECRET_WORD = re.compile(r"confirmation[_ -]?token", re.I)
 CLAIM = re.compile(r"\b(booked for|successfully booked|appointment (?:is|was) booked|booking is confirmed|confirmed for|rescheduled to|cancelled successfully|canceled successfully)\b", re.I)
 LIVE_GOOGLE_CLAIM = re.compile(r"\b(?:google(?: calendar| sheets)?|live calendar|real calendar)\b.{0,100}\b(?:confirmed|successfully|written|created|booked|updated)\b|\b(?:confirmed|successfully|written|created|booked|updated)\b.{0,80}\b(?:google(?: calendar| sheets)?|live calendar|real calendar)\b", re.I)
+GOOGLE_NEGATION = re.compile(
+    r"\b(?:nothing\s+(?:(?:was|is|has been|will be)\s+)?(?:written|created|booked|updated|confirmed)"
+    r"|no\s+(?:google|live|real|calendar|sheets|event|entry|appointment)(?:\s+\w+){0,4}"
+    r"\s+(?:was|is|has been)\s+(?:written|created|booked|updated|confirmed)"
+    r"|(?:was|is|has been|will be|did|does)\s+(?:not|never)\s+(?:successfully\s+)?(?:written|created|booked|updated|confirmed))\b", re.I)
+GOOGLE_FUTURE = re.compile(r"\b(?:will|would|might|may|could|going to|plan to|intend to)\b", re.I)
+
+
+def is_positive_google_claim(text: str) -> bool:
+    """Return true only when a Google/live-calendar write is asserted positively."""
+    for clause in re.split(r"[.!?;]", text):
+        for match in LIVE_GOOGLE_CLAIM.finditer(clause):
+            prefix = clause[max(0, match.start() - 100):match.start()]
+            context = prefix + clause[match.start():match.end()]
+            if GOOGLE_NEGATION.search(context):
+                continue
+            action_context = clause[max(0, match.start() - 35):match.end()]
+            if GOOGLE_FUTURE.search(action_context):
+                continue
+            return True
+    return False
 
 
 def copy_source(destination: Path) -> None:
@@ -330,10 +351,13 @@ def record_and_check(actor: str, user_text: str, response: dict, transcript: lis
     answer = "\n".join(response["messages"])
     state = json.loads(state_path.read_text())
     snapshot_after = fixture_snapshot(state_path)
+    original_answer = answer
+    exposed_token = any(secret and secret in original_answer for secret in token_values(response["calls"]))
     transcript.append({"turn": len(transcript) + 1, "actor": actor, "user": user_text,
                        "assistant": safe_message(response["messages"], response["calls"]),
                        "tool_metadata": [public_call(c) for c in response["calls"]], "raw_calls": response["calls"], "status": response["status"],
-                       "fixture_before": snapshot_before, "fixture_after": snapshot_after})
+                       "fixture_before": snapshot_before, "fixture_after": snapshot_after,
+                       "confirmation_token_exposed": exposed_token})
     if len(transcript) > results["max_turns"]:
         raise RuntimeError("Conversation exceeded --max-turns including clarification followups")
     known = {e["id"]: e for e in state["events"].values()}
@@ -355,8 +379,10 @@ def record_and_check(actor: str, user_text: str, response: dict, transcript: lis
 
     action_evidence_ok = True
     has_pending_confirmation = False
+    practice_metadata_ok = True
     for call in response["calls"]:
         for result in parsed_results(call):
+            practice_metadata_ok &= isinstance(result, dict) and result.get("execution_mode") == "synthetic-practice" and result.get("google_accessed") is False
             has_pending_confirmation |= isinstance(result, dict) and result.get("confirmation_required") is True
             if not isinstance(result, dict) or result.get("calendar_confirmed") is not True:
                 continue
@@ -365,7 +391,7 @@ def record_and_check(actor: str, user_text: str, response: dict, transcript: lis
                 actual = known.get(event["id"])
                 action_evidence_ok &= bool(actual and all(actual.get(k) == event.get(k) for k in ("start", "end", "status", "kind") if k in event))
     action_claim_ok = True
-    if LIVE_GOOGLE_CLAIM.search(answer):
+    if is_positive_google_claim(answer):
         action_claim_ok = False
     else:
         actionable_claims = [match for match in CLAIM.finditer(answer)
@@ -376,7 +402,8 @@ def record_and_check(actor: str, user_text: str, response: dict, transcript: lis
     pending_unchanged = not has_pending_confirmation or snapshot_before == snapshot_after
     confirmed_slots = [(e.get("owner"), e.get("start")) for e in snapshot_after["events"] if e.get("kind") == "appointment" and e.get("status") == "confirmed"]
     no_duplicate_slots = len(confirmed_slots) == len(set(confirmed_slots))
-    passed_turn = response["status"] in ("completed", "ok") and not unexpected and isolation_ok and visible_ok and action_evidence_ok and action_claim_ok and pending_unchanged and no_duplicate_slots
+    server_boundary_ok = all(not c.get("server") or c.get("server") == "clinic" for c in response["calls"])
+    passed_turn = response["status"] in ("completed", "ok") and not unexpected and isolation_ok and visible_ok and action_evidence_ok and action_claim_ok and pending_unchanged and no_duplicate_slots and not exposed_token and practice_metadata_ok and server_boundary_ok
     results["turn_checks"].append({"turn": len(transcript), "actor": actor, "passed": passed_turn,
                                    "tool_surface_ok": not unexpected, "unexpected_tools": unexpected,
                                    "patient_isolation_ok": isolation_ok, "model_visible_appointments_checked": visible_checked,
@@ -385,6 +412,9 @@ def record_and_check(actor: str, user_text: str, response: dict, transcript: lis
                                    "confirmation_required_left_fixture_unchanged": pending_unchanged,
                                    "no_duplicate_confirmed_patient_slots": no_duplicate_slots,
                                    "confirmation_claim_has_persisted_action": action_claim_ok,
+                                   "confirmation_token_not_exposed": not exposed_token,
+                                   "synthetic_tool_metadata_only": practice_metadata_ok,
+                                   "clinic_server_only": server_boundary_ok,
                                    "persisted_event_count": len(known)})
     print(f"[{len(transcript)}/{scripted_total}] {actor}: {'PASS' if passed_turn else 'FAIL'} "
           f"({len(tool_names)} allowed tools, {len(known)} persisted events)", flush=True)
@@ -529,9 +559,19 @@ def main() -> int:
         rescheduled_a = past_result("patient_a", "reschedule_my_appointment", start=dates["tuesday"].isoformat() + "T10:00")
         doctor_rescheduled_a = past_result("doctor", "doctor_reschedule_appointment", start=dates["wednesday"].isoformat() + "T11:00")
         b_initial_contested = past_result("patient_b", "book_my_appointment", start=dates["monday"].isoformat() + "T14:00")
+        b_monday_booking = past_result("patient_b", "book_my_appointment", start=dates["monday"].isoformat() + "T15:00")
+        b_monday_cancel = past_result("patient_b", "cancel_my_appointment", status="cancelled")
         b_wed_booking = past_result("patient_b", "book_my_appointment", start=dates["wednesday"].isoformat() + "T12:00")
         b_wed_cancel = past_result("doctor", "doctor_cancel_appointment", status="cancelled")
-        no_live_google_claims = not any(LIVE_GOOGLE_CLAIM.search(row.get("assistant", "")) for row in transcript)
+        no_live_google_claims = (not any(is_positive_google_claim(row.get("assistant", "")) for row in transcript)
+                                 and all(check.get("synthetic_tool_metadata_only") for check in results["turn_checks"])
+                                 and all(check.get("clinic_server_only") for check in results["turn_checks"]))
+        no_token_exposure = all(check.get("confirmation_token_not_exposed") for check in results["turn_checks"])
+        own_appointment_reads = {row["actor"]: row for row in transcript if row["actor"] in ("patient_a", "patient_b") and row["user"] == "What appointments do I have now?"}
+        patient_lists_ok = (set(own_appointment_reads) == {"patient_a", "patient_b"}
+                            and all(results["turn_checks"][row["turn"] - 1].get("model_visible_appointments_checked")
+                                    and results["turn_checks"][row["turn"] - 1].get("model_visible_appointments_match_owner")
+                                    for row in own_appointment_reads.values()))
         contention = [(i, row) for i, row in enumerate(transcript) if row["actor"] in ("patient_a", "patient_b") and "additional appointment" in row["user"].lower() and "2:00 PM" in row["user"] and row["user"].startswith("Please book me")]
         confirmation_positions = [i for i, row in enumerate(transcript) if row["actor"] in ("patient_a", "patient_b") and re.match(r"\s*yes\b", row["user"], re.I)]
         proposals_preceded = (len(contention) == 2 and len(confirmation_positions) >= 2
@@ -570,6 +610,7 @@ def main() -> int:
             "all_actors_used_requested_model": (all(v == expected_model for v in results["effective_models"].values()) if args.runtime == "codex" else all("haiku" in str(v).lower() for v in results["effective_models"].values())),
             "both_contention_proposals_preceded_confirmations": proposals_preceded,
             "only_one_contested_booking_persisted": bool(original_a and a_moved and original_a.get("id") == a_moved.get("id") and b_initial_contested is None),
+            "patient_b_alternative_booking_then_cancel_kept_stable_id": bool(b_monday_booking and b_monday_cancel and b_monday_booking.get("id") == b_monday_cancel.get("id") and b_monday_cancel.get("status") == "cancelled" and len([e for e in events if e.get("owner") == "patient-b" and e.get("start", "").startswith(dates["monday"].isoformat() + "T15:00")]) == 1),
             "patient_a_reschedule_kept_stable_id": bool(original_a and rescheduled_a and doctor_rescheduled_a and a_moved and original_a.get("id") == rescheduled_a.get("id") == doctor_rescheduled_a.get("id") == a_moved.get("id")),
             "patient_b_cancel_kept_event_and_id": bool(b_wed and b_wed_booking and b_wed_cancel and b_wed["status"] == "cancelled" and b_wed_booking.get("id") == b_wed_cancel.get("id") == b_wed.get("id") and len([e for e in events if e.get("owner") == "patient-b" and e.get("start", "").startswith(dates["wednesday"].isoformat() + "T12:00")]) == 1),
             "doctor_patient_b_booking_persisted": bool(b_tue),
@@ -584,6 +625,8 @@ def main() -> int:
             "patient_a_b_ownership_disjoint": not ({e["id"] for e in events if e.get("owner") == "patient-a"} & {e["id"] for e in events if e.get("owner") == "patient-b"}),
             "no_duplicate_confirmed_patient_slots": no_dups,
             "no_claim_of_google_write_in_synthetic_mode": no_live_google_claims,
+            "no_confirmation_token_exposed": no_token_exposure,
+            "patient_appointment_reads_matched_owned_state": patient_lists_ok,
             "no_google_tools_or_calls": all(not c.get("server") or c.get("server") == "clinic" for turn in transcript for c in turn["tool_metadata"]),
         }
         results["google_accessed"] = False

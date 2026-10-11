@@ -76,10 +76,10 @@ not only after they discover missing auth during booking. If they choose Google,
 inspect non-secret config, prepare optional Google dependencies in PACKAGE/.venv using requirements.lock.txt, and follow README's Google Cloud steps. Do independent
 work while waiting; never treat silence as consent to an OAuth or Google write.
 
-The human creates a Desktop OAuth client, enables Calendar/Sheets APIs, selects
-explicit calendar/spreadsheet IDs and approves browser consent. They provide the
-local client JSON path, never its contents/tokens. Use the trusted `google-configure`
-and `google-connect --client PATH` helpers from the original setup terminal;
+The human creates a Desktop OAuth client, enables Calendar/Sheets APIs and
+approves browser consent. Guided setup lists writable calendars by name and
+offers a new spreadsheet or an existing spreadsheet URL; it saves IDs internally. They provide the
+local client JSON path, never its contents/tokens. Use the trusted `google-setup --client PATH` helper from the original setup terminal;
 these may be launched by the coding assistant with a PTY so the human can complete
 terminal/browser actions. Never expose those operations to the patient agent or
 read authorization secrets into chat. The helper completes a loopback callback,
@@ -88,7 +88,7 @@ Do not silently fall back to plaintext storage. OAuth authenticates the app,
 not the clinic role.
 
 The package currently enables only synthetic scheduling. Google connection and
-read-access checks are implemented, but live booking remains gated pending trusted
+resource selection, setup-only register creation and access checks are implemented, but live booking remains gated pending trusted
 live identity, independent confirmation and OS credential-boundary verification.
 Say this before asking the user to invest in Google setup. No real Google success
 may be claimed without successful API calls. The user can exercise doctor-side

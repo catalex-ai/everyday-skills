@@ -148,6 +148,18 @@ python3 doctor-assistant/tests/run_native_sessions.py
 ```
 
 This uses your Codex model connection and changes only synthetic practice state.
+Reusable multi-day natural conversation evaluations use the same specification
+for Codex Luna and Claude Haiku. Run them only in new output directories:
+
+```sh
+python3 doctor-assistant/tests/run_conversation_eval.py --runtime codex --output-dir /tmp/clinic-luna-eval
+python3 doctor-assistant/tests/run_conversation_eval.py --runtime claude --output-dir /tmp/clinic-haiku-eval
+```
+
+These evaluations use native model connections and synthetic records, without
+Google access. They save redacted transcripts and objective fixture checks. See
+[the evaluation specification](tests/EVAL_SPEC.md). Passing a finite scenario does
+not establish perfect conversation quality or authorize real-patient use.
 Full offline regressions are included for maintainers and CI. Consumers need only
 integrity, smoke and their local runtime audit. See TESTING.md.
 
@@ -177,26 +189,28 @@ Do not paste credential contents or tokens into chat.
 3. Under **Clients**, create an OAuth client with application type **Desktop app**.
    Download its JSON outside this repository, e.g. into a private directory under
    your home directory. Protect the file; never send its contents to the assistant.
-4. Use a separate test clinic calendar and spreadsheet initially. In Calendar's
-   settings, copy the explicit **Calendar ID** under Integrate calendar; do not use
-   `primary`. Copy the real spreadsheet ID from its `/spreadsheets/d/ID/edit` URL.
-   Your Google account must have write access to both. Existing non-matching
-   `Appointments` worksheet headers cause a refusal to overwrite.
-5. Run these from your workspace root:
+4. Run the guided setup below. After browser consent, it lists your writable
+   calendars **by name**; choose the clinic calendar. You do not need to find its ID.
+   Setup asks whether to **create a new spreadsheet** or **use an existing one**.
+   For an existing spreadsheet, paste its ordinary Google Sheets URL. For a new
+   one, choose its title. Setup owns the `Appointments` and `Daily Summary` format;
+   incompatible existing headers are refused before changes. Spreadsheet creation
+   is setup-only and is unavailable to both running agents.
+5. From your workspace root, the creation assistant can start this in a terminal:
 
 ```sh
-doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py google-configure
-doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py google-connect --client "$HOME/private/desktop-client.json"
+doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py google-setup --client "$HOME/private/desktop-client.json"
 doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py google-status
 doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py open-spreadsheet
 ```
 
 The JSON path above is an example; use your actual downloaded client path. The
-configuration command prompts for non-secret fields. Keep `clinic_id` synthetic
+guided setup saves the selected resource IDs internally as non-secret configuration. Keep `clinic_id` synthetic
 until trusted live identity integration is implemented. OAuth opens a browser or
 prints the authorization URL. The local helper handles a random-port loopback
 callback, OAuth state validation and offline consent via `InstalledAppFlow`.
-It stores credentials only in **macOS Keychain** after read-verifying both resources.
+It stores credentials only in **macOS Keychain** after verifying both resources. Creating a new register or initializing empty
+owned worksheets performs explicit setup writes; no appointment is created.
 No deprecated out-of-band or invented device flow is used. Missing Keychain
 backend stops the operation, with no plaintext fallback. No token is printed.
 A 180-second consent timeout can be retried. API write access remains unverified

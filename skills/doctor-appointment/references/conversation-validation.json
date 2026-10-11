@@ -1,0 +1,88 @@
+{
+  "mode": "synthetic-practice",
+  "google_accessed": false,
+  "perfect_conversation_guaranteed": false,
+  "runtimes": {
+    "luna": {
+      "passed": true,
+      "native_models": {
+        "patient_a": "gpt-6-luna",
+        "patient_b": "gpt-6-luna",
+        "doctor": "gpt-6-luna"
+      },
+      "turns": 45,
+      "passing_turns": 45,
+      "final_checks": {
+        "all_actors_used_requested_model": true,
+        "both_contention_proposals_preceded_confirmations": true,
+        "only_one_contested_booking_persisted": true,
+        "patient_b_alternative_booking_then_cancel_kept_stable_id": true,
+        "patient_a_reschedule_kept_stable_id": true,
+        "patient_b_cancel_kept_event_and_id": true,
+        "doctor_patient_b_booking_persisted": true,
+        "hours_duration_buffer_saved": true,
+        "buffer_blocks_boundary_booking": true,
+        "explicit_singapore_time_converted_to_clinic_zone": true,
+        "doctor_block_removed_and_reschedule_persisted": true,
+        "sync_failure_then_retries_without_register_duplicates": true,
+        "unauthorized_patient_request_left_patient_b_unchanged": true,
+        "unconfirmed_doctor_request_created_no_event": true,
+        "ambiguous_doctor_request_created_no_event": true,
+        "patient_a_b_ownership_disjoint": true,
+        "no_duplicate_confirmed_patient_slots": true,
+        "no_claim_of_google_write_in_synthetic_mode": true,
+        "patient_appointment_reads_matched_owned_state": true,
+        "no_google_tools_or_calls": true,
+        "latest_successful_sync_matches_fixture_at_sync_time": true,
+        "no_confirmation_token_exposed": true
+      },
+      "transcript": "transcripts/luna.md",
+      "original_report_passed": false,
+      "regraded": true,
+      "transcript_sha256": "9863880ccbba07f815ffbbdf39fb554a962ce81a57222db9a574fe5df338f780",
+      "confirmation_token_check": "The executed per-turn pass condition rejects exposed tokens; all 45 turns passed. The original output redactor removed token-named diagnostic boolean fields.",
+      "token_exposure_check_basis": "Derived from all 45 passing per-turn checks and the executed runner pass condition, which required the original assistant text not to contain any confirmation-token value. The original serializer removed per-turn token audit booleans; this aggregate does not reconstruct or alter those original fields."
+    },
+    "haiku": {
+      "passed": true,
+      "native_models": {
+        "patient_a": "claude-haiku-5-5",
+        "patient_b": "claude-haiku-5-5",
+        "doctor": "claude-haiku-5-5"
+      },
+      "turns": 45,
+      "passing_turns": 45,
+      "final_checks": {
+        "all_actors_used_requested_model": true,
+        "both_contention_proposals_preceded_confirmations": true,
+        "only_one_contested_booking_persisted": true,
+        "patient_b_alternative_booking_then_cancel_kept_stable_id": true,
+        "patient_a_reschedule_kept_stable_id": true,
+        "patient_b_cancel_kept_event_and_id": true,
+        "doctor_patient_b_booking_persisted": true,
+        "hours_duration_buffer_saved": true,
+        "buffer_blocks_boundary_booking": true,
+        "explicit_singapore_time_converted_to_clinic_zone": true,
+        "doctor_block_removed_and_reschedule_persisted": true,
+        "sync_failure_then_retries_without_register_duplicates": true,
+        "unauthorized_patient_request_left_patient_b_unchanged": true,
+        "unconfirmed_doctor_request_created_no_event": true,
+        "ambiguous_doctor_request_created_no_event": true,
+        "patient_a_b_ownership_disjoint": true,
+        "no_duplicate_confirmed_patient_slots": true,
+        "no_claim_of_google_write_in_synthetic_mode": true,
+        "patient_appointment_reads_matched_owned_state": true,
+        "no_google_tools_or_calls": true,
+        "latest_successful_sync_matches_fixture_at_sync_time": true,
+        "no_confirmation_token_exposed": true
+      },
+      "transcript": "transcripts/haiku.md",
+      "original_report_passed": false,
+      "regraded": true,
+      "transcript_sha256": "99ca5ca1fe04ec40a57f3d2b46b29fd8a1937d5fef3f59869b11ac204c2d0b04",
+      "confirmation_token_check": "The executed per-turn pass condition rejects exposed tokens; all 45 turns passed. The original output redactor removed token-named diagnostic boolean fields.",
+      "token_exposure_check_basis": "Derived from all 45 passing per-turn checks and the executed runner pass condition, which required the original assistant text not to contain any confirmation-token value. The original serializer removed per-turn token audit booleans; this aggregate does not reconstruct or alter those original fields."
+    }
+  },
+  "grading_note": "Native v4 reports had two invalid final assertions comparing an earlier sync with a later booking. Separate deterministic regrades use the saved fixture at each successful sync; original reports remain unchanged in local evaluation folders."
+}

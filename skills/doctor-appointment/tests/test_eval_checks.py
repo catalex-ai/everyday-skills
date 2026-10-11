@@ -9,6 +9,30 @@ spec.loader.exec_module(runner)
 
 
 class PositiveGoogleClaimTests(unittest.TestCase):
+    def test_redaction_keeps_only_trusted_boolean_token_audit_flags(self):
+        value = {
+            "confirmation_token_exposed": False,
+            "confirmation_token_not_exposed": True,
+            "no_confirmation_token_exposed": True,
+            "confirmation_token": "secret-token-value-123",
+            "confirmation_token_not_exposed_text": "secret-token-value-456",
+            "confirmation_token_hack": False,
+            "nested": {"confirmation_token": "nested-secret-value"},
+        }
+        redacted = runner.redact(value)
+        self.assertEqual(redacted, {
+            "confirmation_token_exposed": False,
+            "confirmation_token_not_exposed": True,
+            "no_confirmation_token_exposed": True,
+            "nested": {},
+        })
+        serialized = str(redacted)
+        self.assertNotIn("secret-token-value-123", serialized)
+        self.assertNotIn("secret-token-value-456", serialized)
+        self.assertNotIn("nested-secret-value", serialized)
+        value["confirmation_token_exposed"] = "malicious replacement"
+        self.assertNotIn("confirmation_token_exposed", runner.redact(value))
+
     def test_explicit_practice_disclaimers_are_not_claims(self):
         samples = [
             "Nothing is written to Google Calendar or Google Sheets.",
@@ -58,6 +82,34 @@ class PositiveGoogleClaimTests(unittest.TestCase):
     def test_followup_selector_never_repeats_prepared_confirmation(self):
         calls = [{"result": {"content": [{"type": "text", "text": '{"confirmation_required":true}'}]}}]
         self.assertIsNone(runner.clarification_followup("Which date and time?", calls, "Yes, please."))
+
+    def test_register_checkpoint_excludes_blocks_but_requires_all_appointments(self):
+        snapshot = {"register_ids": ["a", "b"], "events": [
+            {"id": "a", "kind": "appointment"}, {"id": "b", "kind": "appointment"},
+            {"id": "block-1", "kind": "block"},
+        ]}
+        self.assertTrue(runner.register_matches_snapshot(snapshot))
+        self.assertFalse(runner.register_matches_snapshot({**snapshot, "register_ids": ["a"]}))
+
+    def test_later_unsynced_appointment_does_not_invalidate_sync_checkpoint(self):
+        checkpoint = {"register_ids": ["a"], "events": [{"id": "a", "kind": "appointment"}]}
+        later = {"register_ids": ["a"], "events": [
+            {"id": "a", "kind": "appointment"}, {"id": "b", "kind": "appointment"}]}
+        transcript = [{"fixture_after": checkpoint, "tool_metadata": [{"tool": "doctor_sync_register", "structured_results": [{"synced": True}]}]},
+                      {"fixture_after": later, "tool_metadata": []}]
+        self.assertTrue(runner.successful_syncs_reconciled(transcript))
+
+    def test_each_successful_sync_matches_appointments_at_that_checkpoint(self):
+        first = {"register_ids": ["a"], "events": [{"id": "a", "kind": "appointment"}]}
+        second = {"register_ids": ["a", "b"], "events": [
+            {"id": "a", "kind": "appointment"}, {"id": "b", "kind": "appointment"}]}
+        transcript = [
+            {"fixture_after": first, "tool_metadata": [{"tool": "doctor_sync_register", "structured_results": [{"synced": True}]}]},
+            {"fixture_after": second, "tool_metadata": [{"tool": "doctor_sync_register", "structured_results": [{"synced": True}]}]},
+        ]
+        self.assertTrue(runner.successful_syncs_reconciled(transcript))
+        transcript[1]["fixture_after"]["register_ids"] = ["a"]
+        self.assertFalse(runner.successful_syncs_reconciled(transcript))
 
     def test_prior_disclaimer_does_not_mask_later_positive_claim(self):
         sample = "Nothing is written to Google Calendar. I successfully booked it in Google Calendar."

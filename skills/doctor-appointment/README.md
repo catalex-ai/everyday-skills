@@ -158,7 +158,10 @@ python3 doctor-assistant/tests/run_conversation_eval.py --runtime claude --outpu
 
 These evaluations use native model connections and synthetic records, without
 Google access. They save redacted transcripts and objective fixture checks. See
-[the evaluation specification](tests/EVAL_SPEC.md). Passing a finite scenario does
+[the evaluation specification](tests/EVAL_SPEC.md). Published actual transcripts are available for
+[Codex Luna](references/transcripts/luna.md) and
+[Claude Haiku](references/transcripts/haiku.md), with
+[validation results](references/conversation-validation.json). Passing a finite scenario does
 not establish perfect conversation quality or authorize real-patient use.
 Full offline regressions are included for maintainers and CI. Consumers need only
 integrity, smoke and their local runtime audit. See TESTING.md.

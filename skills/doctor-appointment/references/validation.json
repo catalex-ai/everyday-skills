@@ -1,9 +1,9 @@
 {
   "version": "0.3.0",
-  "tested_at": "2026-10-11T15:46:54.303875+00:00",
+  "tested_at": "2026-10-11T15:57:48.156274+00:00",
   "tests": {
     "doctor_appointment": {
-      "passed": 89,
+      "passed": 95,
       "failed": 0
     },
     "existing_drive_detox": {
@@ -287,7 +287,7 @@
     "GATEWAY.md": "e3791e5f21b6c5c47b79be74e62e4f3b79754d9b354346a873413a376dce17e3",
     "PRIVACY.md": "38171e5340673d3f0d93fe6c1b1fb6cf62606aa8426001a186611c037ba4f1f6",
     "Patient Assistant.command": "0f6d9fc43442205006019ce9ba52ba07e47538478e17f43216de6c4e11922e54",
-    "README.md": "fe83d0270bcbfe315cf7898539e67300e13f5da906cb209b767b141e9a39f98f",
+    "README.md": "b7f86540617072709aa6a97d0dda00a815c2bd0f11a7c938d57184e2b1a25a30",
     "SECURITY.md": "016167a7896cfc811ef21ce80893624d2c0895b8d86324716b5425b3326cd2f7",
     "SKILL.md": "99a36a93c30e9119d0139756506cc50ab83c85dd6f9dbebb745b3b79255483bf",
     "TESTING.md": "df22dc3a856569c4b31f21f0f031d3d2dc8454b08740d9114c441590075763cd",
@@ -309,20 +309,23 @@
     "patient-agent/.mcp.json": "9e21a4ce9776295fd4d2127b1d8a7476b020ab9e9c5e3623eb60b057befefc28",
     "patient-agent/AGENTS.md": "ee48865ecd8d9128e48022269a022c58e3ef02da374801cf83a8a67f07e9d463",
     "patient-agent/CLAUDE.md": "336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49",
+    "references/conversation-validation.json": "da4f2dcf5254941d9d6971db7a5db215adad3dd6e2e3681c1fc937e4d48ff3b4",
+    "references/transcripts/haiku.md": "2f959e4307a189b2cbb0921bc598d7eefe6e4eba62813a6fed63e333bf23d50d",
+    "references/transcripts/luna.md": "9d2de64c6cc808b7507ae6ee85ab800ce92250918e273dbf0d0e15a9c1dacd3b",
     "requirements.lock.txt": "1dc25320144415bdd46885647dec8d3d19b34a6e41ac93ee8cb1d5c33d3e1ae3",
     "requirements.txt": "9a51ae3dbcbd7b051abe42a46244254e5d6d2c4ce1b80299beebd5671e002c63",
     "scripts/verify_package.py": "f56f48291637e80dc5f6fdeb2d5f468748056917c82c6cb0b5beb363fbe78e49",
     "start.sh": "72b5dd433dafe086c33c1fb3056e034a9abbf7869c3f93ac9d41f335f275798a",
-    "tests/EVAL_SPEC.md": "36181e3f8e2d97389f60e19493266d73bfc00c80a2e8b15dc105139e6dc41e59",
+    "tests/EVAL_SPEC.md": "832f371083b9b6d1b82217485b9cbfe9dcb6d0a265121bca6368565c9d7d7290",
     "tests/claude_session.py": "9a73fb71a85f4a6eb35ca9ba38cd7399539916ac7c83531fd7dcc2a173ccf7d4",
-    "tests/run_conversation_eval.py": "3fd9492cbcc61c8c6768619bdbef277d8ad057950368bb956a147fbb1b151113",
+    "tests/run_conversation_eval.py": "ecdb2337b99ecfa9fdfcd00d3a2a38b2e082ef7f87cb1ccc0d4265aa758d6322",
     "tests/run_native_sessions.py": "bb68acb705f60578236cad393c83d240a27f55d867df11687e687a5691683b0c",
     "tests/scenarios.json": "e00c75f4998afadd34bff70bb6fb59c9a443473bb1100fb74db8c45c6810549a",
     "tests/test_adapters.py": "9f4fda461a00ac0ab7046cfe905ba82bd7c306a6d28ee1999553055e5b6556d4",
-    "tests/test_eval_checks.py": "f4061da645d5e76310898f3feb446492574a95d782a6832b25be7aefbbf158f4",
-    "tests/test_oauth_setup.py": "2079ec2dd9bc2873979dc0edda590b1540334a6ba91aa59797db77bedd40ad37",
+    "tests/test_eval_checks.py": "a7c649fb034edf7a397e91e2545fdbc459955598f6be152914508965705a84e5",
+    "tests/test_oauth_setup.py": "152c1bbdaf5ef96e264e3fbff3f50b4cf6da91e887abba394f20d024d7e94c26",
     "tests/test_security.py": "e0fb189d90a8bf713bc3016bb7a5de59ac31be403a6dad41a5729dedd9bb83a8",
-    "tools/admin.py": "07fc209daa0575f091d8515ac66be15539f30ba1b621b7d713d600c273e143dd",
+    "tools/admin.py": "67c420308d9785890bab4215c9ec8c1baa02024796890d8b76b2e6d539aa4092",
     "tools/audit.py": "6e946eb198ee2f7c2a1d6f34be2f9dfb1348063096a925c2169dcb94589861eb",
     "tools/core.py": "c4e99df7410b696d7342a97260bd29f5bbdf8aa92502e0840a1d6eff9c34c74e",
     "tools/google_adapter.py": "6cdfa9a45e2682677c209f1902c43085a88a5ec249636c80cc09519ac4570ccf",
@@ -338,10 +341,15 @@
     "claude_discovery_defect": "fixed with explicit native plugin and prompt-file flags; role Skill calls observed"
   },
   "conversation_evaluations": {
-    "status": "in-progress",
+    "status": "passed-synthetic-scenarios",
     "codex_model": "gpt-6-luna",
     "claude_actual_model": "claude-haiku-5-5",
-    "final_acceptance_passed": false,
-    "google_live_verified": false
+    "turns_per_runtime": 45,
+    "total_native_turns": 90,
+    "final_acceptance_passed": true,
+    "grading": "Checkpoint-based deterministic regrade of preserved full traces; original reports retained with known checker failures",
+    "details": "references/conversation-validation.json",
+    "google_live_verified": false,
+    "perfect_conversation_guaranteed": false
   }
 }

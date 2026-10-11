@@ -102,6 +102,19 @@ class OAuthSetupTests(unittest.TestCase):
         self.assertIn('existing Google Sheets URL',err.getvalue())
         self.assertNotIn('google-configure',err.getvalue())
 
+    def test_provider_value_and_permission_errors_never_print_exception_text(self):
+        sentinel='refresh_token=mock-secret-sentinel'
+        for error in (ValueError(sentinel),PermissionError(sentinel)):
+            with self.subTest(error_type=type(error).__name__),patch.object(admin,'main',side_effect=error),contextlib.redirect_stderr(io.StringIO()) as err:
+                with self.assertRaises(SystemExit):admin.run()
+            self.assertNotIn(sentinel,err.getvalue())
+            self.assertIn(type(error).__name__,err.getvalue())
+
+    def test_trusted_admin_validation_remains_actionable(self):
+        with patch.object(admin,'main',side_effect=admin.AdminError('Choose an existing spreadsheet URL')),contextlib.redirect_stderr(io.StringIO()) as err:
+            with self.assertRaises(SystemExit):admin.run()
+        self.assertIn('Choose an existing spreadsheet URL',err.getvalue())
+
     def test_package_client_path_rejected_before_oauth(self):
         inside=self.root/'client.json';inside.write_text('{}')
         with patch.object(sys,'argv',['admin.py','google-setup','--client',str(inside)]),contextlib.redirect_stderr(io.StringIO()):

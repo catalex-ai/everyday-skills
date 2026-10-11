@@ -45,6 +45,20 @@ class PositiveGoogleClaimTests(unittest.TestCase):
             with self.subTest(sample=sample):
                 self.assertFalse(runner.is_positive_google_claim(sample))
 
+    def test_followup_selector_does_not_answer_initial_booking_choice(self):
+        answer = ("I found your existing appointment. Would you like me to book this as "
+                  "an additional appointment or reschedule the existing one?")
+        self.assertIsNone(runner.clarification_followup(answer, [], "Yes, that time works for me."))
+
+    def test_followup_selector_only_resolves_temporal_question_after_yes(self):
+        answer = "Which date and time did you mean?"
+        self.assertIsNotNone(runner.clarification_followup(answer, [], "Yes, please."))
+        self.assertIsNone(runner.clarification_followup(answer, [], "What time do you prefer?"))
+
+    def test_followup_selector_never_repeats_prepared_confirmation(self):
+        calls = [{"result": {"content": [{"type": "text", "text": '{"confirmation_required":true}'}]}}]
+        self.assertIsNone(runner.clarification_followup("Which date and time?", calls, "Yes, please."))
+
     def test_prior_disclaimer_does_not_mask_later_positive_claim(self):
         sample = "Nothing is written to Google Calendar. I successfully booked it in Google Calendar."
         self.assertTrue(runner.is_positive_google_claim(sample))

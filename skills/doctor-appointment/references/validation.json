@@ -1,9 +1,9 @@
 {
   "version": "0.3.0",
-  "tested_at": "2026-10-11T15:37:31.384082+00:00",
+  "tested_at": "2026-10-11T15:40:39.515735+00:00",
   "tests": {
     "doctor_appointment": {
-      "passed": 84,
+      "passed": 87,
       "failed": 0
     },
     "existing_drive_detox": {
@@ -15,7 +15,7 @@
     "shortcut_entrypoints": "passed: both roles/runtimes, spaced paths, exact flags and invalid input"
   },
   "runtime_audit": {
-    "time": "2026-10-11T15:12:19.861632+00:00",
+    "time": "2026-10-11T15:37:10.656727+00:00",
     "version": "0.2.0",
     "mode": "synthetic-only",
     "runtimes": {
@@ -315,11 +315,11 @@
     "start.sh": "72b5dd433dafe086c33c1fb3056e034a9abbf7869c3f93ac9d41f335f275798a",
     "tests/EVAL_SPEC.md": "36181e3f8e2d97389f60e19493266d73bfc00c80a2e8b15dc105139e6dc41e59",
     "tests/claude_session.py": "9a73fb71a85f4a6eb35ca9ba38cd7399539916ac7c83531fd7dcc2a173ccf7d4",
-    "tests/run_conversation_eval.py": "335e70d98e2b953bc1721808d8de92e2793a7c599a4997a4f701276c1fdd9a4a",
+    "tests/run_conversation_eval.py": "c5198cb59172b770755047a7f33bc110893525694c26caadc9b2ec72fc4252c2",
     "tests/run_native_sessions.py": "bb68acb705f60578236cad393c83d240a27f55d867df11687e687a5691683b0c",
     "tests/scenarios.json": "e00c75f4998afadd34bff70bb6fb59c9a443473bb1100fb74db8c45c6810549a",
     "tests/test_adapters.py": "9f4fda461a00ac0ab7046cfe905ba82bd7c306a6d28ee1999553055e5b6556d4",
-    "tests/test_eval_checks.py": "79077774a36cc77cbf6de489e9ac76ad473fb84359d7fa44cf6b2eabd00c78ae",
+    "tests/test_eval_checks.py": "f4061da645d5e76310898f3feb446492574a95d782a6832b25be7aefbbf158f4",
     "tests/test_oauth_setup.py": "2079ec2dd9bc2873979dc0edda590b1540334a6ba91aa59797db77bedd40ad37",
     "tests/test_security.py": "309e369a80ab11f4c44c336ab65e39b090065391c22c7c764b3bfd473eed9131",
     "tools/admin.py": "07fc209daa0575f091d8515ac66be15539f30ba1b621b7d713d600c273e143dd",

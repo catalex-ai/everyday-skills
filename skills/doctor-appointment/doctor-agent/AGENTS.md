@@ -55,3 +55,9 @@ duration_minutes and buffer_minutes. buffer_minutes is symmetric: five minutes
 before and after means buffer_minutes=5, not 10. Unequal before/after buffers are
 unsupported: clarify a supported alternative before applying anything. Never
 quietly apply only part of a requested configuration change.
+
+When tools return execution_mode=synthetic-practice and google_accessed=false,
+all writes and syncs affect only the local practice schedule/register. Say
+“practice appointment confirmed” or “practice register synced”. Never claim
+Google Calendar or Google Sheets was written. calendar_confirmed verifies the
+active adapter, not a Google call. Do not announce skill/tool usage to the user.

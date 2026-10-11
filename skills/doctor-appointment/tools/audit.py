@@ -26,9 +26,11 @@ def inventory(stream,role):
             if isinstance(block,dict) and block.get('type')=='tool_result':results.append(bool(block.get('is_error',False)))
     role_skill='clinic-role:'+('appointments' if role=='patient' else 'clinic')
     skill_discovered=role_skill in init.get('skills',[])
+    actual_model=init.get('model','')
+    haiku_verified=isinstance(actual_model,str) and actual_model.startswith('claude-haiku-')
     clinic_call=any(name and name.startswith('mcp__clinic__') for name in calls)
     connected=bool(init.get('mcp_servers')) and all(s.get('status')=='connected' for s in init['mcp_servers'])
-    return {'status':'passed' if not extra and not missing and connected and clinic_call and skill_discovered and not any(results) else 'failed','role_skill_discovered':skill_discovered,'native_skills':init.get('skills',[]),'actual_tools':sorted(actual),'unexpected_tools':sorted(extra),'missing_tools':sorted(missing),'mcp_connected':connected,'observed_tool_calls':calls,'clinic_call_observed':clinic_call,'tool_error_observed':any(results)}
+    return {'status':'passed' if not extra and not missing and connected and clinic_call and skill_discovered and haiku_verified and not any(results) else 'failed','actual_model':actual_model,'haiku_verified':haiku_verified,'role_skill_discovered':skill_discovered,'native_skills':init.get('skills',[]),'actual_tools':sorted(actual),'unexpected_tools':sorted(extra),'missing_tools':sorted(missing),'mcp_connected':connected,'observed_tool_calls':calls,'clinic_call_observed':clinic_call,'tool_error_observed':any(results)}
 
 class RPC:
     def __init__(self,role,root=ROOT):
@@ -69,6 +71,7 @@ def codex_audit(role):
         disabled=('shell_tool','apps','plugins','browser_use','browser_use_external','computer_use','image_generation','in_app_browser','multi_agent','multi_agent_v2','view_image','request_permissions_tool')
         feature_check=all(config.get('features',{}).get(k) is False for k in disabled)
         actual_profile=thread.get('activePermissionProfile');approval=thread.get('approvalPolicy')
+        actual_model=thread.get('model');model_match=actual_model==config.get('model')=='gpt-6-luna'
         # Controlled OS probes use synthetic canaries, never credential files.
         canary=ROOT/'config'/'audit-canary.txt'
         if canary.exists():raise RuntimeError('Probe path already exists; refusing overwrite')
@@ -91,8 +94,8 @@ def codex_audit(role):
             for skill in entry.get('skills',[]):
                 if str(folder/'.agents'/'skills') in str(skill.get('path','')):paths.append(Path(skill['path']).parent.name)
         expected_skill='appointments' if role=='patient' else 'clinic'
-        passed=names=={'clinic'} and tools==expected and feature_check and approval=='never' and actual_profile and read['denied'] and not read['canary_leaked'] and modify['denied'] and write_absent and network['denied'] and expected_skill in paths
-        return {'status':'passed' if passed else 'failed','mcp_servers':sorted(names),'actual_clinic_tools':sorted(tools),'effective_disabled_features':{k:config.get('features',{}).get(k) for k in disabled},'active_permission_profile':actual_profile,'approval_policy':approval,'instruction_sources':thread.get('instructionSources',[]),'native_skills':paths,'filesystem_read_probe':read,'filesystem_write_probe':modify,'write_probe_file_absent':write_absent,'network_probe':network,'builtin_tool_inventory':{'status':'unverified','reason':'Native MCP inventory and effective config verified; complete built-in model schema not exposed by this audit'},'config_api_verified':True}
+        passed=model_match and names=={'clinic'} and tools==expected and feature_check and approval=='never' and actual_profile and read['denied'] and not read['canary_leaked'] and modify['denied'] and write_absent and network['denied'] and expected_skill in paths
+        return {'status':'passed' if passed else 'failed','actual_model':actual_model,'configured_model_verified':model_match,'mcp_servers':sorted(names),'actual_clinic_tools':sorted(tools),'effective_disabled_features':{k:config.get('features',{}).get(k) for k in disabled},'active_permission_profile':actual_profile,'approval_policy':approval,'instruction_sources':thread.get('instructionSources',[]),'native_skills':paths,'filesystem_read_probe':read,'filesystem_write_probe':modify,'write_probe_file_absent':write_absent,'network_probe':network,'builtin_tool_inventory':{'status':'unverified','reason':'Native MCP inventory and effective config verified; complete built-in model schema not exposed by this audit'},'config_api_verified':True}
     finally:rpc.close()
 
 def claude_audit(role):

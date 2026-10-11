@@ -35,7 +35,7 @@ its existing login. No Google credentials are needed for practice.
 ## Open an assistant
 
 After the one-time preparation, double-click **Patient Assistant.command** or
-**Doctor Assistant.command** in Finder. These open native Codex with the tested
+**Doctor Assistant.command** in Finder. These open native Codex on **GPT-6-Luna** with the tested
 restrictions. The shortcuts use your login shell's PATH to locate the CLI.
 
 From a terminal, the same minimal entry point supports either runtime:
@@ -69,7 +69,11 @@ CODEX_HOME="$PWD/.codex" codex --no-daemon --strict-config --dangerously-bypass-
 ```
 
 Codex natively loads `AGENTS.md`, `.agents/skills/appointments` or `clinic`, and
-`.codex/config.toml`. The scoped home prevents inherited user MCP/plugins/settings.
+`.codex/config.toml`. The scoped home prevents inherited user MCP/plugins/settings. Both role configs
+default to `gpt-6-luna`; the native audit checks the actual thread model. If Luna
+is unavailable on your account, stop rather than silently choose another model.
+Claude defaults to **Haiku** through its role settings. The native audit records
+the actual Haiku model; Claude does not run the OpenAI Luna model.
 The native clinic permission profile grants only minimal runtime files and role
 instructions/skills read access; it denies config/credential reads, all writes
 and command networking. Shell, browser, apps, plugins, image/file viewing,

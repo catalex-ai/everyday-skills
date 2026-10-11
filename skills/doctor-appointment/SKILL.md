@@ -41,7 +41,8 @@ Resolve paths against `PACKAGE`; preserve unrelated files and configuration.
 5. Audit each requested runtime with `python3 PACKAGE/tools/audit.py --runtime codex`
    or `--runtime claude`. Failed/missing observations are not permission passes.
    The native runtime must discover the role-specific skills/instructions and
-   expose only its clinic MCP methods. Use the exact commands in README.
+   expose only its clinic MCP methods. Both Codex roles default to gpt-6-luna;
+   verify the actual model through the audit and never silently substitute. Use the exact commands in README.
 
 Codex discovers `AGENTS.md`, `.agents/skills`, and the isolated `.codex/config.toml`.
 Claude uses native `--append-system-prompt-file AGENTS.md` and `--plugin-dir .claude`

@@ -44,5 +44,6 @@
     "enabled": true,
     "allowUnsandboxedCommands": false,
     "failIfUnavailable": true
-  }
+  },
+  "model": "haiku"
 }

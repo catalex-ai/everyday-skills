@@ -45,3 +45,9 @@ Interpret appointment times in the configured clinic timezone unless the user
 explicitly gives another timezone. State the clinic timezone in the proposal;
 do not infer a patient timezone from the host terminal or introduce conversions
 unless requested. Clarify conflicting timezone wording.
+
+When tools return execution_mode=synthetic-practice and google_accessed=false,
+all writes and syncs affect only the local practice schedule/register. Say
+“practice appointment confirmed” or “practice register synced”. Never claim
+Google Calendar or Google Sheets was written. calendar_confirmed verifies the
+active adapter, not a Google call. Do not announce skill/tool usage to the user.

@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "timezone": "Asia/Kolkata",
+  "messages": [
+    {
+      "actor": "patient_a",
+      "text": "Please book me an additional appointment on {monday} at 2:00 PM, and keep my existing 9:00 AM appointment."
+    },
+    {
+      "actor": "patient_b",
+      "text": "Please book me an additional appointment on {monday} at 2:00 PM, and keep my existing 10:00 AM appointment."
+    },
+    {
+      "actor": "patient_a",
+      "text": "Yes, that time works for me."
+    },
+    {
+      "actor": "patient_b",
+      "text": "Yes, please book that exact time."
+    },
+    {
+      "actor": "patient_b",
+      "text": "Then find me an additional appointment on {monday} at 3:00 PM, please."
+    },
+    {
+      "actor": "patient_b",
+      "text": "Yes, book the proposed additional appointment at 3:00 PM."
+    },
+    {
+      "actor": "doctor",
+      "text": "Show me the appointments for {monday}."
+    },
+    {
+      "actor": "patient_a",
+      "text": "Please move my additional {monday} 2:00 PM appointment to {tuesday} at 10:00 AM."
+    },
+    {
+      "actor": "patient_a",
+      "text": "Yes, move my additional appointment to {tuesday} at 10:00 AM."
+    },
+    {
+      "actor": "patient_b",
+      "text": "Please cancel my {monday} 3:00 PM appointment. I cannot make it."
+    },
+    {
+      "actor": "patient_b",
+      "text": "Yes, please cancel it."
+    },
+    {
+      "actor": "doctor",
+      "text": "Change our opening hours to 10:00 AM until 5:00 PM, appointments to 20 minutes, and the buffer to 5 minutes before and after each appointment."
+    },
+    {
+      "actor": "doctor",
+      "text": "Yes, apply those exact clinic settings."
+    },
+    {
+      "actor": "patient_a",
+      "text": "Can I book an appointment on {wednesday} at 9:00 AM?"
+    },
+    {
+      "actor": "patient_a",
+      "text": "Could you offer 10:00 AM that day instead?"
+    },
+    {
+      "actor": "patient_a",
+      "text": "Yes, book 10:00 AM."
+    },
+    {
+      "actor": "patient_a",
+      "text": "Could you book another appointment on {wednesday} at 10:20 AM?"
+    },
+    {
+      "actor": "doctor",
+      "text": "Block {tuesday} from 10:00 AM to 11:00 AM."
+    },
+    {
+      "actor": "doctor",
+      "text": "Yes, add that block even though there may be an appointment conflict."
+    },
+    {
+      "actor": "doctor",
+      "text": "Please move Patient A's {tuesday} 10:00 AM appointment to {wednesday} at 11:00 AM."
+    },
+    {
+      "actor": "doctor",
+      "text": "Yes, move Patient A's appointment to {wednesday} at 11:00 AM."
+    },
+    {
+      "actor": "doctor",
+      "text": "Remove the block on {tuesday} from 10:00 AM to 11:00 AM."
+    },
+    {
+      "actor": "doctor",
+      "text": "Yes, remove that block."
+    },
+    {
+      "actor": "doctor",
+      "text": "Book Patient B for {tuesday} at 3:00 PM."
+    },
+    {
+      "actor": "doctor",
+      "text": "Yes, book Patient B at {tuesday} 3:00 PM."
+    },
+    {
+      "actor": "patient_b",
+      "text": "Could you book me on {wednesday} at noon, please?"
+    },
+    {
+      "actor": "patient_b",
+      "text": "Yes, book Wednesday at noon."
+    },
+    {
+      "actor": "patient_b",
+      "text": "Please book that same Wednesday noon appointment again."
+    },
+    {
+      "actor": "doctor",
+      "text": "Cancel Patient B's {wednesday} noon appointment, and keep the {tuesday} appointment."
+    },
+    {
+      "actor": "doctor",
+      "text": "Yes, cancel only Patient B's {wednesday} noon appointment."
+    },
+    {
+      "actor": "doctor",
+      "text": "Show the schedules for {tuesday} and {wednesday}."
+    },
+    {
+      "actor": "doctor",
+      "text": "Sync the appointment register."
+    },
+    {
+      "actor": "doctor",
+      "text": "Please try syncing again and tell me the result."
+    },
+    {
+      "actor": "doctor",
+      "text": "Sync once more and check for duplicate records."
+    },
+    {
+      "actor": "patient_a",
+      "text": "What appointments do I have now?"
+    },
+    {
+      "actor": "patient_b",
+      "text": "What appointments do I have now?"
+    },
+    {
+      "actor": "patient_a",
+      "text": "Please cancel Patient B's appointment on {tuesday} at 3:00 PM. I am asking for them."
+    },
+    {
+      "actor": "patient_a",
+      "text": "Please show my appointments again."
+    },
+    {
+      "actor": "patient_a",
+      "text": "Book me for {wednesday} at 4:30 PM Singapore time."
+    },
+    {
+      "actor": "patient_a",
+      "text": "Yes, book that time in the clinic's local timezone."
+    },
+    {
+      "actor": "doctor",
+      "text": "Please book someone for an afternoon next week."
+    },
+    {
+      "actor": "doctor",
+      "text": "Patient B, please."
+    },
+    {
+      "actor": "doctor",
+      "text": "Thursday at 2:00 PM, please."
+    },
+    {
+      "actor": "patient_b",
+      "text": "I might need an appointment sometime next week in the afternoon."
+    },
+    {
+      "actor": "patient_b",
+      "text": "I am only asking what information you need; please do not book anything yet."
+    }
+  ],
+  "models": {
+    "codex": "gpt-6-luna",
+    "claude": "haiku"
+  }
+}

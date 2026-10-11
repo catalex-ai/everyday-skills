@@ -16,7 +16,9 @@ class PracticeRuntime:
             state=json.loads(self.path.read_text()) if self.path.exists() else fixture()
             self.service.config=state['config'];self.service.cal=MockCalendar(state['events'])
             self.service.sheets=MockSheets(state['records'],state['fail_next']);self.service.sheets.last=state['last_sync']
-            try:return self.service.call(name,args)
+            try:
+                result=self.service.call(name,args)
+                return result | {'execution_mode':'synthetic-practice','google_accessed':False}
             finally:
                 atomic(self.path,{'config':self.service.config,'events':self.service.cal.events,'records':self.service.sheets.records,'fail_next':self.service.sheets.fail_next,'last_sync':self.service.sheets.last})
 

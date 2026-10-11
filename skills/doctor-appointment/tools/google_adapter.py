@@ -20,22 +20,41 @@ def credentials():
     if not value:raise RuntimeError('Google is not connected')
     return Credentials.from_authorized_user_info(json.loads(value),SCOPES)
 
-def connect(client_path,calendar_id,spreadsheet_id):
+def authorize(client_path):
+    """Terminal-only installed-app consent; credentials never become tool output."""
     from google_auth_oauthlib.flow import InstalledAppFlow
-    backend=keychain()
+    keychain() # Fail before opening a browser if secure storage is unavailable.
     client=json.loads(client_path.read_text())
     if 'installed' not in client:raise ValueError('Google OAuth Desktop app client required')
-    if not calendar_id or calendar_id=='primary' or not spreadsheet_id:raise ValueError('Explicit calendar and spreadsheet IDs required')
     flow=InstalledAppFlow.from_client_config(client,SCOPES)
-    # Supported loopback flow, random port, state validation handled by oauthlib.
     creds=flow.run_local_server(host='127.0.0.1',port=0,open_browser=True,timeout_seconds=180,
         authorization_prompt_message='Approve Google access in the browser: {url}',
         success_message='Authorization complete. Return to your terminal.',access_type='offline',prompt='consent')
     if not creds.refresh_token:raise RuntimeError('No refresh token issued; consent did not complete')
+    return creds
+
+def store_credentials(creds):
+    keychain().set_password(SERVICE,ACCOUNT,creds.to_json())
+
+def connect(client_path,calendar_id,spreadsheet_id):
+    if not calendar_id or calendar_id=='primary' or not spreadsheet_id:raise ValueError('Explicit calendar and spreadsheet IDs required')
+    creds=authorize(client_path)
     Calendar(creds,calendar_id).verify()
     Sheets(creds,spreadsheet_id).verify()
-    backend.set_password(SERVICE,ACCOUNT,creds.to_json())
+    store_credentials(creds)
     return {'connected':True,'calendar_verified':True,'spreadsheet_verified':True}
+
+def list_calendars(creds):
+    """Setup-only writable calendar metadata for human selection; no events."""
+    from googleapiclient.discovery import build
+    api=build('calendar','v3',credentials=creds,cache_discovery=False)
+    result=[];token=None
+    while True:
+        page=api.calendarList().list(minAccessRole='writer',maxResults=250,pageToken=token,showDeleted=False).execute()
+        result.extend({k:c[k] for k in ('id','summary','accessRole','primary') if k in c}
+                      for c in page.get('items',[]) if c.get('accessRole') in ('writer','owner') and c.get('id')!='primary')
+        token=page.get('nextPageToken')
+        if not token:return result
 
 def revoke():
     import requests
@@ -154,6 +173,31 @@ class Sheets:
         import re
         if not re.fullmatch(r'[A-Za-z0-9_-]{10,200}',ident or ''):raise ValueError('Valid configured spreadsheet ID required')
         self.api=build('sheets','v4',credentials=creds,cache_discovery=False);self.ident=ident
+    @classmethod
+    def create(cls,creds,title):
+        """Setup-only creation after the human chooses a new register."""
+        from googleapiclient.discovery import build
+        if not isinstance(title,str) or not title.strip() or len(title)>200:raise ValueError('Provide a register title of 1–200 characters')
+        api=build('sheets','v4',credentials=creds,cache_discovery=False)
+        created=api.spreadsheets().create(body={'properties':{'title':title.strip()},'sheets':[
+            {'properties':{'title':'Appointments'}},{'properties':{'title':'Daily Summary'}}]},fields='spreadsheetId').execute(num_retries=0)
+        # A timed-out create must be reviewed by the human, never blindly retried.
+        result=cls(creds,created['spreadsheetId']);result.initialize_register();return result
+    def initialize_register(self):
+        """Preflight existing owned tabs; preserve data and unrelated worksheets."""
+        meta=self.verify();titles={x['properties']['title'] for x in meta['sheets']}
+        headers={'Appointments':self.HEADERS,'Daily Summary':['Date','Status','Appointments']}
+        empty=[]
+        for title,expected in headers.items():
+            if title not in titles:empty.append(title);continue
+            if title=='Appointments':self.read_records() # schema + duplicate IDs
+            rows=self.api.spreadsheets().values().get(spreadsheetId=self.ident,range="'"+title+"'!"+('A:G' if title=='Appointments' else 'A:C')).execute().get('values',[])
+            if rows and rows[0]!=expected:raise ValueError(title+' schema mismatch; refusing overwrite')
+            if not rows:empty.append(title)
+        self.ensure()
+        if empty:self.api.spreadsheets().values().batchUpdate(spreadsheetId=self.ident,body={'valueInputOption':'RAW','data':[
+            {'range':"'"+title+"'!A1",'values':[headers[title]]} for title in empty]}).execute(num_retries=0)
+        return {'initialized':True,'worksheets':['Appointments','Daily Summary']}
     def verify(self):return self.api.spreadsheets().get(spreadsheetId=self.ident,fields='spreadsheetId,sheets.properties').execute()
     def ensure(self):
         meta=self.verify();titles={s['properties']['title'] for s in meta['sheets']}

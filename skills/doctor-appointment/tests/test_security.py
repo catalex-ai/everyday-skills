@@ -53,6 +53,12 @@ class ClinicTests(unittest.TestCase):
         self.assertTrue(self.doc.available(stamp(end)+timedelta(minutes=5),stamp(end)+timedelta(minutes=25)))
         with self.assertRaises(ValueError):
             self.doc.call('doctor_configure_clinic',{'changes':{'buffer_before_minutes':5}})
+    def test_practice_response_explicitly_denies_google_access(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime=PracticeRuntime('patient',state_path=Path(tmp)/'state.json')
+            result=runtime.call('get_my_appointments',{})
+            self.assertEqual(result['execution_mode'],'synthetic-practice')
+            self.assertIs(result['google_accessed'],False)
     def test_unverified_patient(self):
         with self.assertRaises(Denied):Service(Identity('patient-a','patient','synthetic-clinic','gateway',False),self.cal,self.sheets).call('get_my_appointments',{})
     def test_tool_separation(self):

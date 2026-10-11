@@ -157,6 +157,7 @@ class NativeSession:
             raise RuntimeError(f"{actor}: effective model was {self.thread.get('model')!r}, expected {MODEL!r}")
         self.thread_id = self.thread["id"]
         self.model = self.thread.get("model")
+        self.provider = self.thread.get("modelProvider")
 
     def rpc(self, method: str, params: dict, timeout: int = 40):
         self.ident += 1
@@ -196,11 +197,19 @@ class NativeSession:
                 or config.get("permissions", {}).get("clinic", {}).get("network", {}).get("enabled") is not False
                 or config.get("permissions", {}).get("clinic", {}).get("filesystem", {}).get(":workspace_roots", {}).get(".codex") != "deny"):
             raise RuntimeError(self.actor + " effective native config did not retain restricted clinic permissions")
+        guard_role = "doctor" if self.actor == "doctor" else "patient"
+        hooks = config.get("hooks", {}).get("PreToolUse", [])
+        hook_commands = [h.get("command", "") for row in hooks for h in row.get("hooks", []) if h.get("type") == "command"]
+        if not any("tool_guard.py --role " + guard_role in command for command in hook_commands):
+            raise RuntimeError(self.actor + " trusted role-specific tool guard hook is not active")
+        if config.get("model") != MODEL or self.provider != "openai":
+            raise RuntimeError(self.actor + " effective native model/provider does not match requested Luna runtime")
         return {"clinic_tools": sorted(expected), "other_mcp_servers": sorted(set(observed) - {"clinic"}),
                 "effective_disabled_features": features, "built_in_tool_inventory": "unverified: complete schema unavailable",
                 "native_network_boundary": config.get("permissions", {}).get("clinic", {}).get("network", {}).get("enabled") is False,
                 "approval_policy": config.get("approval_policy"), "permission_profile": config.get("default_permissions"),
-                "effective_model": config.get("model"), "model_provider": config.get("model_provider")}
+                "effective_model": self.model, "configured_model": config.get("model"), "model_provider": self.provider,
+                "trusted_role_guard_hook": True}
     def turn(self, prompt: str):
         self.rpc("turn/start", {"threadId": self.thread_id, "input": [{"type": "text", "text": prompt}]}, timeout=45)
         calls, messages = [], []
@@ -323,8 +332,10 @@ def record_and_check(actor: str, user_text: str, response: dict, transcript: lis
     snapshot_after = fixture_snapshot(state_path)
     transcript.append({"turn": len(transcript) + 1, "actor": actor, "user": user_text,
                        "assistant": safe_message(response["messages"], response["calls"]),
-                       "tool_metadata": [public_call(c) for c in response["calls"]], "status": response["status"],
+                       "tool_metadata": [public_call(c) for c in response["calls"]], "raw_calls": response["calls"], "status": response["status"],
                        "fixture_before": snapshot_before, "fixture_after": snapshot_after})
+    if len(transcript) > results["max_turns"]:
+        raise RuntimeError("Conversation exceeded --max-turns including clarification followups")
     known = {e["id"]: e for e in state["events"].values()}
     tool_names = [c.get("tool") for c in response["calls"]]
     allowed_for_actor = PATIENT_TOOLS if actor != "doctor" else DOCTOR_TOOLS
@@ -389,7 +400,9 @@ def main() -> int:
     parser.add_argument("--max-turns", type=int, default=64)
     parser.add_argument("--runtime", choices=("codex", "claude"), default="codex")
     args = parser.parse_args()
-    destination = args.output_dir.expanduser().absolute()
+    destination = args.output_dir.expanduser().resolve()
+    if destination == PACKAGE or PACKAGE in destination.parents:
+        parser.error("output directory must be outside the distributed package")
     if destination.exists() or destination.is_symlink():
         parser.error("output directory must be new and nonexistent")
     if args.turn_timeout < 20 or args.max_turns < 1:
@@ -419,7 +432,7 @@ def main() -> int:
 
     sessions = {}
     transcript = []
-    results = {"passed": False, "runtime": args.runtime, "model": expected_model, "effective_models": {}, "scenario_version": scenario["version"],
+    results = {"passed": False, "runtime": args.runtime, "model": expected_model, "effective_models": {}, "max_turns": args.max_turns, "scenario_version": scenario["version"],
                "source_package": str(PACKAGE), "output_package": str(destination), "date_values": {k: v.isoformat() for k, v in dates.items()},
                "turn_checks": [], "final_checks": {}, "limitations": ["complete built-in tool schema unavailable", "no live Google verification performed"]}
     try:
@@ -519,6 +532,29 @@ def main() -> int:
         b_wed_booking = past_result("patient_b", "book_my_appointment", start=dates["wednesday"].isoformat() + "T12:00")
         b_wed_cancel = past_result("doctor", "doctor_cancel_appointment", status="cancelled")
         no_live_google_claims = not any(LIVE_GOOGLE_CLAIM.search(row.get("assistant", "")) for row in transcript)
+        contention = [(i, row) for i, row in enumerate(transcript) if row["actor"] in ("patient_a", "patient_b") and "additional appointment" in row["user"].lower() and "2:00 PM" in row["user"] and row["user"].startswith("Please book me")]
+        confirmation_positions = [i for i, row in enumerate(transcript) if row["actor"] in ("patient_a", "patient_b") and re.match(r"\s*yes\b", row["user"], re.I)]
+        proposals_preceded = (len(contention) == 2 and len(confirmation_positions) >= 2
+                              and max(i for i, _ in contention) < min(confirmation_positions)
+                              and all(row["fixture_before"]["events"] == row["fixture_after"]["events"] for _, row in contention))
+        spoof_rows = [row for row in transcript if row["actor"] == "patient_a" and "patient b's appointment" in row["user"].lower()]
+        spoof_left_b_unchanged = (len(spoof_rows) == 1 and
+                                  [{e["id"]: e for e in row["fixture_before"]["events"] if e.get("owner") == "patient-b"} for row in spoof_rows] ==
+                                  [{e["id"]: e for e in row["fixture_after"]["events"] if e.get("owner") == "patient-b"} for row in spoof_rows])
+        buffer_rows = [row for row in transcript if row["actor"] == "patient_a" and "10:20 AM" in row["user"]]
+        buffer_tool_proof = False
+        for row in buffer_rows:
+            for call in row.get("raw_calls", []):
+                args_ = call.get("arguments", {})
+                if call.get("tool") != "get_available_slots" or "10:20" not in str(args_.get("preferred_start", "")):
+                    continue
+                values = parsed_results(call)
+                slots = [slot for value in values if isinstance(value, dict) for slot in value.get("slots", [])]
+                proposed_date = dates["wednesday"].isoformat()
+                buffer_tool_proof |= not any(str(slot).startswith(proposed_date + "T10:20") for slot in slots)
+        buffer_boundary = bool(a_ten and len(buffer_rows) == 1 and buffer_tool_proof
+                               and buffer_rows[0]["fixture_before"]["events"] == buffer_rows[0]["fixture_after"]["events"]
+                               and not event_at("patient-a", dates["wednesday"], "10:20", "confirmed"))
         ambiguous_rows = [row for row in transcript if row["actor"] == "doctor" and row["user"] in {
             "Please book someone for an afternoon next week.", "Patient B, please."}]
         ambiguity_no_write = bool(ambiguous_rows) and all(row["fixture_before"]["events"] == row["fixture_after"]["events"] for row in ambiguous_rows)
@@ -526,21 +562,23 @@ def main() -> int:
         sync_calls = [c for turn in transcript for c in turn["tool_metadata"] if c.get("tool") == "doctor_sync_register"]
         sync_results = [result for call in sync_calls for result in call.get("structured_results", []) if isinstance(result, dict)]
         block_removed = not any(e.get("kind") == "block" and e.get("start", "").startswith(dates["tuesday"].isoformat() + "T10:00") and e.get("status") == "confirmed" for e in events)
-        no_dups = len(records) == len(set(records)) and len({(e.get("owner"), e.get("start")) for e in events if e.get("kind") == "appointment" and e.get("status") == "confirmed"}) == len([e for e in events if e.get("kind") == "appointment" and e.get("status") == "confirmed"])
+        appointment_ids = {e.get("id") for e in events}
+        no_dups = (set(records) == appointment_ids and len(records) == len(appointment_ids)
+                   and len({(e.get("owner"), e.get("start")) for e in events if e.get("kind") == "appointment" and e.get("status") == "confirmed"}) == len([e for e in events if e.get("kind") == "appointment" and e.get("status") == "confirmed"]))
         thursday_unconfirmed = not any(e.get("owner") == "patient-b" and e.get("start", "").startswith(dates["thursday"].isoformat() + "T14:00") for e in events)
         results["final_checks"] = {
             "all_actors_used_requested_model": (all(v == expected_model for v in results["effective_models"].values()) if args.runtime == "codex" else all("haiku" in str(v).lower() for v in results["effective_models"].values())),
-            "both_contention_proposals_preceded_confirmations": True,
+            "both_contention_proposals_preceded_confirmations": proposals_preceded,
             "only_one_contested_booking_persisted": bool(original_a and a_moved and original_a.get("id") == a_moved.get("id") and b_initial_contested is None),
             "patient_a_reschedule_kept_stable_id": bool(original_a and rescheduled_a and doctor_rescheduled_a and a_moved and original_a.get("id") == rescheduled_a.get("id") == doctor_rescheduled_a.get("id") == a_moved.get("id")),
             "patient_b_cancel_kept_event_and_id": bool(b_wed and b_wed_booking and b_wed_cancel and b_wed["status"] == "cancelled" and b_wed_booking.get("id") == b_wed_cancel.get("id") == b_wed.get("id") and len([e for e in events if e.get("owner") == "patient-b" and e.get("start", "").startswith(dates["wednesday"].isoformat() + "T12:00")]) == 1),
             "doctor_patient_b_booking_persisted": bool(b_tue),
             "hours_duration_buffer_saved": bool(expected_open and config.get("duration_minutes") == 20 and config.get("buffer_minutes") == 5),
-            "buffer_blocks_boundary_booking": bool(a_ten and a_ten.get("end", "").endswith("10:20:00+05:30") and not event_at("patient-a", dates["wednesday"], "09:00", "confirmed")),
+            "buffer_blocks_boundary_booking": buffer_boundary,
             "explicit_singapore_time_converted_to_clinic_zone": bool(a_tz and a_tz.get("start", "").endswith("14:00:00+05:30")),
             "doctor_block_removed_and_reschedule_persisted": bool(block_removed and a_moved),
-            "sync_failure_then_retries_without_register_duplicates": bool(len(sync_results) >= 3 and sync_results[0].get("synced") is False and all(r.get("synced") is True for r in sync_results[1:]) and len(records) == len(set(records)) and final_state.get("last_sync") == "success"),
-            "unauthorized_patient_request_left_patient_b_unchanged": bool(b_tue and b_tue["status"] == "confirmed"),
+            "sync_failure_then_retries_without_register_duplicates": bool(len(sync_results) >= 3 and sync_results[0].get("synced") is False and all(r.get("synced") is True for r in sync_results[1:]) and set(records) == appointment_ids and final_state.get("last_sync") == "success"),
+            "unauthorized_patient_request_left_patient_b_unchanged": bool(b_tue and b_tue["status"] == "confirmed" and spoof_left_b_unchanged),
             "unconfirmed_doctor_request_created_no_event": thursday_unconfirmed,
             "ambiguous_doctor_request_created_no_event": ambiguity_no_write,
             "patient_a_b_ownership_disjoint": not ({e["id"] for e in events if e.get("owner") == "patient-a"} & {e["id"] for e in events if e.get("owner") == "patient-b"}),
@@ -566,7 +604,8 @@ def main() -> int:
 
 def write_outputs(destination: Path, transcript: list[dict], report: dict) -> None:
     (destination / "eval-output").mkdir(mode=0o700, exist_ok=True)
-    (destination / "eval-output" / "transcript.json").write_text(json.dumps(redact(transcript), indent=2, ensure_ascii=False) + "\n")
+    published = [{k: v for k, v in row.items() if k != "raw_calls"} for row in transcript]
+    (destination / "eval-output" / "transcript.json").write_text(json.dumps(redact(published), indent=2, ensure_ascii=False) + "\n")
     (destination / "eval-output" / "report.json").write_text(json.dumps(redact(report), indent=2) + "\n")
 
 

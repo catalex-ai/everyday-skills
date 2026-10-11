@@ -90,3 +90,9 @@ Use the configured clinic timezone for relative dates; patient sessions can read
 clinic_today from get_clinic_information. Do not use the computer timezone to
 resolve tomorrow. For ambiguous phrases such as next week, clarify or state the
 actual proposed calendar date before seeking confirmation.
+
+When showing the doctor a schedule, include the authorized patient label from
+patient_reference for each appointment, together with its time and status. Use
+Patient A / Patient B for the synthetic labels; never show internal IDs or invent
+patient names. Identify blocks separately. A one-appointment schedule still needs
+the patient label.

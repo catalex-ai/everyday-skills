@@ -1,6 +1,6 @@
 {
-  "version": "0.3.0",
-  "tested_at": "2026-10-11T15:57:48.156274+00:00",
+  "version": "0.3.1",
+  "tested_at": "2026-10-11T16:03:55.721925+00:00",
   "tests": {
     "doctor_appointment": {
       "passed": 95,
@@ -287,19 +287,19 @@
     "GATEWAY.md": "e3791e5f21b6c5c47b79be74e62e4f3b79754d9b354346a873413a376dce17e3",
     "PRIVACY.md": "38171e5340673d3f0d93fe6c1b1fb6cf62606aa8426001a186611c037ba4f1f6",
     "Patient Assistant.command": "0f6d9fc43442205006019ce9ba52ba07e47538478e17f43216de6c4e11922e54",
-    "README.md": "b7f86540617072709aa6a97d0dda00a815c2bd0f11a7c938d57184e2b1a25a30",
+    "README.md": "ffad1accb767b4e58e8aabc9daa1d47d7cbbff01b79319b1de2a099097c1592b",
     "SECURITY.md": "016167a7896cfc811ef21ce80893624d2c0895b8d86324716b5425b3326cd2f7",
     "SKILL.md": "99a36a93c30e9119d0139756506cc50ab83c85dd6f9dbebb745b3b79255483bf",
     "TESTING.md": "df22dc3a856569c4b31f21f0f031d3d2dc8454b08740d9114c441590075763cd",
     "agents/openai.yaml": "5327bc3e3c27b2dde5c2b7486ec2fdb0f8b4c3a878b82f2d0260c5d52329d5ca",
     "config/clinic.example.json": "07a1a904520b04c5ae68a7210c44c2b79b335e5546b137c754163b13ba6a85b0",
-    "doctor-agent/.agents/skills/clinic/SKILL.md": "dec289ca77efadbf6561715026434dfb22ece3279412a3da2b4d56a9371ca589",
+    "doctor-agent/.agents/skills/clinic/SKILL.md": "bc9cc1b51b6b2efaea072ec6444c87bbf154e51c19f733e91e7f97e3b4c83548",
     "doctor-agent/.claude/.claude-plugin/plugin.json": "9925e36e3fef0a66304379f464c9756386db6c3a19e4f13f86c11a4d1ce5c076",
     "doctor-agent/.claude/settings.json": "28b71b7ccc1ea3d58de0c1c764a19d7de9c4b90e918a9dfda0cde6ca61aa8cef",
-    "doctor-agent/.claude/skills/clinic/SKILL.md": "dec289ca77efadbf6561715026434dfb22ece3279412a3da2b4d56a9371ca589",
+    "doctor-agent/.claude/skills/clinic/SKILL.md": "bc9cc1b51b6b2efaea072ec6444c87bbf154e51c19f733e91e7f97e3b4c83548",
     "doctor-agent/.codex/config.toml": "395b4aa8b1d573f0941bb6036ad2a6574a0a356c2383b6c12b949dc8bf04c026",
     "doctor-agent/.mcp.json": "4bcca5eeb1c003ff3a9f0835348df02c044167f810c7c55e21b50ce529024d25",
-    "doctor-agent/AGENTS.md": "c2f11ad97aca8bd100bb25638f8f6b4de9748f317347622a379a455b2beef180",
+    "doctor-agent/AGENTS.md": "6ef8a490c1f51d70a56bdb811f9fd01eeaab4e1ddf120c1282f5178765947df4",
     "doctor-agent/CLAUDE.md": "336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49",
     "patient-agent/.agents/skills/appointments/SKILL.md": "201f76edeb1f6b6f6700dfeeb535f9b0edad67f44b3eeb45b1a96ce55c8c2f31",
     "patient-agent/.claude/.claude-plugin/plugin.json": "9925e36e3fef0a66304379f464c9756386db6c3a19e4f13f86c11a4d1ce5c076",
@@ -310,6 +310,8 @@
     "patient-agent/AGENTS.md": "ee48865ecd8d9128e48022269a022c58e3ef02da374801cf83a8a67f07e9d463",
     "patient-agent/CLAUDE.md": "336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49",
     "references/conversation-validation.json": "da4f2dcf5254941d9d6971db7a5db215adad3dd6e2e3681c1fc937e4d48ff3b4",
+    "references/fresh-clone-validation.json": "93eb0a82bdd38230af58c5beb3c8987744f314ce96b49ca8b7ce3877afa5cbf1",
+    "references/transcripts/fresh-clone.md": "9e0075e53061a8b887925db801be28d8a863c9bc95ed1b79a31ac57b20305e1c",
     "references/transcripts/haiku.md": "2f959e4307a189b2cbb0921bc598d7eefe6e4eba62813a6fed63e333bf23d50d",
     "references/transcripts/luna.md": "9d2de64c6cc808b7507ae6ee85ab800ce92250918e273dbf0d0e15a9c1dacd3b",
     "requirements.lock.txt": "1dc25320144415bdd46885647dec8d3d19b34a6e41ac93ee8cb1d5c33d3e1ae3",
@@ -351,5 +353,18 @@
     "details": "references/conversation-validation.json",
     "google_live_verified": false,
     "perfect_conversation_guaranteed": false
+  },
+  "fresh_public_clone": {
+    "integrity": "passed",
+    "offline_smoke": "passed",
+    "native_booking_and_doctor_visibility": "passed",
+    "native_turns": 8,
+    "runtime_models": [
+      "gpt-6-luna",
+      "claude-haiku-5-5"
+    ],
+    "patient_labels_in_doctor_summary": "passed after explicit instruction refinement",
+    "details": "references/fresh-clone-validation.json",
+    "google_accessed": false
   }
 }

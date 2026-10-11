@@ -1,0 +1,75 @@
+{
+  "passed": true,
+  "google_accessed": false,
+  "turns": [
+    {
+      "runtime": "codex",
+      "actor": "patient",
+      "model": "gpt-6-luna",
+      "user": "Book me an appointment on Tuesday, October 13 at 2:00 PM.",
+      "assistant": "I\u2019ll check availability for October 13 at 2:00 PM in the clinic\u2019s timezone, then prepare the exact appointment proposal.\nThis is a practice appointment. I\u2019m checking October 13 at 2:00 PM in the clinic\u2019s Asia/Kolkata timezone.\nI can book Tuesday, October 13, from 2:00 to 2:30 PM in the clinic\u2019s Asia/Kolkata timezone. Shall I confirm this practice appointment?",
+      "status": "completed"
+    },
+    {
+      "runtime": "codex",
+      "actor": "patient",
+      "model": "gpt-6-luna",
+      "user": "Yes, please.",
+      "assistant": "Your practice appointment is confirmed for Tuesday, October 13, 2:00\u20132:30 PM, Asia/Kolkata time.",
+      "status": "completed"
+    },
+    {
+      "runtime": "codex",
+      "actor": "doctor",
+      "model": "gpt-6-luna",
+      "user": "Show me the appointments for Tuesday, October 13.",
+      "assistant": "I\u2019ll check the current schedule for October 13 in the clinic\u2019s configured timezone.\nThere is one confirmed practice appointment on Tuesday, October 13, from 2:00 to 2:30 PM. The schedule is in the clinic\u2019s configured timezone.",
+      "status": "completed"
+    },
+    {
+      "runtime": "claude",
+      "actor": "patient",
+      "model": "claude-haiku-5-5",
+      "user": "Book me an appointment on Wednesday, October 14 at 2:00 PM.",
+      "assistant": "This is a practice booking, so it only affects the local practice schedule. No Google Calendar or Sheets records are changed.\n\nI can book this:\n\n- **Wednesday, October 14, 2026, 2:00 PM to 2:30 PM** (clinic time, India Standard Time)\n\nShould I go ahead and book it? Please reply yes or no.",
+      "status": "ok"
+    },
+    {
+      "runtime": "claude",
+      "actor": "patient",
+      "model": "claude-haiku-5-5",
+      "user": "Yes, please.",
+      "assistant": "Your practice appointment is confirmed for **Wednesday, October 14, 2026, 2:00 PM to 2:30 PM** (clinic time, India Standard Time).",
+      "status": "ok"
+    },
+    {
+      "runtime": "claude",
+      "actor": "doctor",
+      "model": "claude-haiku-5-5",
+      "user": "Show me the appointments for Wednesday, October 14.",
+      "assistant": "Wednesday, October 14 has one appointment:\n\n- **2:00 PM to 2:30 PM**, Patient A, confirmed\n\nTimes are in the clinic's timezone (UTC+05:30). This is practice mode, so the change only affects the local practice schedule, not Google Calendar.",
+      "status": "ok"
+    },
+    {
+      "runtime": "codex",
+      "actor": "doctor",
+      "model": "gpt-6-luna",
+      "user": "Show me the appointments for 2026-10-13.",
+      "assistant": "I\u2019ll check the current schedule for 13 October in the clinic\u2019s timezone.\nThere\u2019s one appointment on 13 October: **Patient A, 2:00\u20132:30 PM, confirmed** (clinic time). This is a practice schedule; Google Calendar wasn\u2019t accessed.",
+      "status": "completed",
+      "phase": "patient-label-regression"
+    },
+    {
+      "runtime": "claude",
+      "actor": "doctor",
+      "model": "claude-haiku-5-5",
+      "user": "Show me the appointments for 2026-10-13.",
+      "assistant": "Tuesday, 13 October 2026 has one appointment:\n\n- **2:00 PM \u2013 2:30 PM** (clinic time, +05:30): **Patient A**, confirmed\n\nNo blocks are listed for that day. This is the practice schedule, so nothing was checked against Google Calendar.",
+      "status": "ok",
+      "phase": "patient-label-regression"
+    }
+  ],
+  "patient_label_regression_passed": true,
+  "base_public_commit": "d11077cc7ba3e163260f60a161c1d923f7031a10",
+  "refinement": "Last two doctor turns verify the final instruction refinement requiring patient labels in one-appointment summaries."
+}

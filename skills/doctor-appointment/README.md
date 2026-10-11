@@ -161,7 +161,9 @@ Google access. They save redacted transcripts and objective fixture checks. See
 [the evaluation specification](tests/EVAL_SPEC.md). Published actual transcripts are available for
 [Codex Luna](references/transcripts/luna.md) and
 [Claude Haiku](references/transcripts/haiku.md), with
-[validation results](references/conversation-validation.json). Passing a finite scenario does
+[validation results](references/conversation-validation.json). A separate
+[fresh public-clone check](references/transcripts/fresh-clone.md) verifies native
+booking and doctor visibility on both models. Passing a finite scenario does
 not establish perfect conversation quality or authorize real-patient use.
 Full offline regressions are included for maintainers and CI. Consumers need only
 integrity, smoke and their local runtime audit. See TESTING.md.

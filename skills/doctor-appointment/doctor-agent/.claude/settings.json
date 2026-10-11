@@ -1,6 +1,24 @@
 {
   "permissions": {
     "defaultMode": "dontAsk",
+    "disableBypassPermissionsMode": "disable",
+    "allow": [
+      "mcp__clinic__doctor_block_time",
+      "mcp__clinic__doctor_book_appointment",
+      "mcp__clinic__doctor_cancel_appointment",
+      "mcp__clinic__doctor_configure_clinic",
+      "mcp__clinic__doctor_connection_status",
+      "mcp__clinic__doctor_get_appointment",
+      "mcp__clinic__doctor_get_schedule",
+      "mcp__clinic__doctor_open_spreadsheet",
+      "mcp__clinic__doctor_reschedule_appointment",
+      "mcp__clinic__doctor_review_issues",
+      "mcp__clinic__doctor_sync_register",
+      "mcp__clinic__doctor_sync_status",
+      "mcp__clinic__doctor_unblock_time",
+      "mcp__clinic__doctor_verify_synthetic_appointment",
+      "Skill(clinic)"
+    ],
     "deny": [
       "Bash",
       "PowerShell",
@@ -13,9 +31,26 @@
       "WebSearch",
       "Agent",
       "NotebookEdit",
-      "Skill",
       "ToolSearch"
     ]
   },
-  "disableAllHooks": true
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ../tools/tool_guard.py --role doctor",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "allowUnsandboxedCommands": false,
+    "failIfUnavailable": true
+  }
 }

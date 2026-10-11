@@ -46,7 +46,7 @@ PATIENT = {'get_available_slots','get_my_appointments','book_my_appointment',
 DOCTOR = {'doctor_get_schedule','doctor_get_appointment','doctor_configure_clinic',
           'doctor_block_time','doctor_unblock_time','doctor_cancel_appointment',
           'doctor_reschedule_appointment','doctor_sync_register','doctor_sync_status',
-          'doctor_review_issues','doctor_open_spreadsheet','doctor_connection_status','doctor_verify_synthetic_appointment'}
+          'doctor_review_issues','doctor_open_spreadsheet','doctor_connection_status','doctor_verify_synthetic_appointment','doctor_book_appointment'}
 
 DEFAULT = dict(clinic_id='synthetic-clinic', clinic_name='Practice Clinic', timezone='Asia/Kolkata',
     working_days=[0,1,2,3,4,5], opening='09:00', closing='17:00', breaks=[['13:00','14:00']],
@@ -117,7 +117,7 @@ class Service:
         return self.cal.busy(a-pad,b+pad,exclude)
     def available(self,a,b,exclude=None):
         return self.valid_hours(a,b) and not self.conflicts(a,b,exclude)
-    def slots(self, day):
+    def slots(self, day, preferred_start=None):
         d=date.fromisoformat(day); z=ZoneInfo(self.config['timezone']); c=self.config
         a=datetime.combine(d,time.fromisoformat(c['opening']),z)
         finish=datetime.combine(d,time.fromisoformat(c['closing']),z)
@@ -126,7 +126,12 @@ class Service:
             b=a+timedelta(minutes=c['duration_minutes'])
             if a>datetime.now(z) and self.available(a,b): slots.append(a.isoformat())
             a+=timedelta(minutes=c['duration_minutes']+c['buffer_minutes'])
-        return {'slots':slots,'timezone':c['timezone']}
+        if preferred_start:
+            preferred=stamp(preferred_start).astimezone(z)
+            if preferred.date()!=d:raise ValueError('Requested start must match day in clinic timezone')
+            finish=preferred+timedelta(minutes=c['duration_minutes'])
+            if preferred>datetime.now(z) and self.available(preferred,finish) and preferred.isoformat() not in slots:slots.append(preferred.isoformat())
+        return {'slots':sorted(slots),'timezone':c['timezone']}
     def book(self,start,request_id,confirmation_token=None):
         if not re.fullmatch(r'[A-Za-z0-9_-]{8,100}',request_id): raise ValueError('Request ID must contain 8–100 safe characters')
         a,b=self.interval(start)
@@ -187,12 +192,19 @@ class Service:
             kind=schemas['properties'][k]['type']
             if kind=='string' and (not isinstance(v,str) or len(v)>1000):raise ValueError('Invalid string')
             if kind=='object' and not isinstance(v,dict):raise ValueError('Invalid object')
-        if tool=='get_available_slots':return self.slots(args['day'])
+            if 'enum' in schemas['properties'][k] and v not in schemas['properties'][k]['enum']:raise ValueError('Unknown configured patient')
+        if tool=='get_available_slots':return self.slots(args['day'],args.get('preferred_start'))
         if tool=='get_my_appointments':return {'appointments':[public_event(e) for e in self.cal.owned_events(self.identity.clinic,self.identity.subject)]}
         if tool=='book_my_appointment':return self.book(**args)
         if tool=='cancel_my_appointment':return self.change('cancel',args['appointment_id'],token=args.get('confirmation_token'))
         if tool=='reschedule_my_appointment':return self.change('reschedule',args['appointment_id'],args['start'],args.get('confirmation_token'))
         if tool=='get_clinic_information':return {k:self.config[k] for k in ('clinic_name','timezone','address','contact','confirmation_policy','cancellation_policy')}
+        if tool=='doctor_book_appointment':
+            from mock import MockCalendar
+            if not isinstance(self.cal,MockCalendar):raise Denied('Trusted live patient directory not configured')
+            patient=Service(Identity(args['patient_reference'],'patient',self.identity.clinic,'synthetic',True),self.cal,self.sheets,self.config)
+            patient.pending=self.pending
+            return patient.book(args['start'],args['request_id'],args.get('confirmation_token'))
         if tool=='doctor_get_schedule':
             day=date.fromisoformat(args['day']);z=ZoneInfo(self.config['timezone']);a=datetime.combine(day,time(),z)
             return {'appointments':[public_event(e) for e in self.cal.schedule(a,a+timedelta(days=1))]}
@@ -256,11 +268,12 @@ class Service:
 def schema(properties={},required=()):
     return {'type':'object','properties':{k:({'type':v} if isinstance(v,str) else v) for k,v in properties.items()},'required':list(required),'additionalProperties':False}
 ARGUMENTS={
- 'get_available_slots':schema({'day':'string'},['day']), 'get_my_appointments':schema(),
+ 'get_available_slots':schema({'day':'string','preferred_start':'string'},['day']), 'get_my_appointments':schema(),
  'get_clinic_information':schema(),
  'book_my_appointment':schema({'start':'string','request_id':'string','confirmation_token':'string'},['start','request_id']),
  'cancel_my_appointment':schema({'appointment_id':'string','confirmation_token':'string'},['appointment_id']),
  'reschedule_my_appointment':schema({'appointment_id':'string','start':'string','confirmation_token':'string'},['appointment_id','start']),
+ 'doctor_book_appointment':schema({'patient_reference':{'type':'string','enum':['patient-a','patient-b']},'start':'string','request_id':'string','confirmation_token':'string'},['patient_reference','start','request_id']),
  'doctor_get_schedule':schema({'day':'string'},['day']),
  'doctor_get_appointment':schema({'appointment_id':'string'},['appointment_id']),
  'doctor_configure_clinic':schema({'changes':'object','confirmation_token':'string'},['changes']),

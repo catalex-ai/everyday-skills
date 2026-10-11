@@ -7,7 +7,7 @@ An open-source collection of practical AI workflows for everyday life and work.
 ## Skills
 | Skill | Outcome | Status |
 |---|---|---|
-| [Doctor Appointment](skills/doctor-appointment/README.md) | Prebuilt tools and two restricted Claude Code terminals for patient and doctor appointment practice. | Offline synthetic mode; Google OAuth helpers included; real-patient mode blocked pending identity and OS-boundary verification |
+| [Doctor Appointment](skills/doctor-appointment/README.md) | Prebuilt tools and two restricted native Codex or Claude Code terminals for patient and doctor appointment practice. | Offline synthetic mode; Google OAuth helpers included; real-patient mode blocked pending identity and OS-boundary verification |
 | [Drive Detox](skills/drive-detox/README.md) | Audit a local folder or Google Drive read-only: biggest files, stale files, duplicate groups, and a cleanup plan you approve before anything moves. | Local mode works out of the box; Drive mode needs a `drive.readonly` token or your own MCP connection |
 
 ## Getting started

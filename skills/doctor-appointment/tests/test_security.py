@@ -8,7 +8,6 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from core import *
 from mock import MockCalendar,MockSheets,fixture
 from server import PracticeRuntime
-from launch import command,environment
 from audit import inventory
 
 class ClinicTests(unittest.TestCase):
@@ -102,6 +101,14 @@ class ClinicTests(unittest.TestCase):
     def test_dst_timezone(self):
         c=copy.deepcopy(DEFAULT);c['timezone']='America/New_York';validate_config(c)
         self.assertNotEqual(datetime(2027,1,1,tzinfo=ZoneInfo(c['timezone'])).utcoffset(),datetime(2027,7,1,tzinfo=ZoneInfo(c['timezone'])).utcoffset())
+    def test_exact_requested_slot_checked(self):
+        result=self.a.call('get_available_slots',{'day':self.day,'preferred_start':self.slot})
+        self.assertIn(self.slot,result['slots'])
+        result=self.a.call('get_available_slots',{'day':self.day,'preferred_start':self.cal.events['b-demo']['start']})
+        self.assertNotIn(self.cal.events['b-demo']['start'],result['slots'])
+    def test_requested_slot_wrong_day_denied(self):
+        wrong=(date.fromisoformat(self.day)+timedelta(days=1)).isoformat()+'T14:00:00+05:30'
+        with self.assertRaises(ValueError):self.a.call('get_available_slots',{'day':self.day,'preferred_start':wrong})
     def test_buffers_and_breaks(self):
         self.assertFalse(self.a.available(stamp(self.day+'T09:35:00+05:30'),stamp(self.day+'T10:05:00+05:30')))
         self.assertFalse(self.a.available(stamp(self.day+'T13:00:00+05:30'),stamp(self.day+'T13:30:00+05:30')))
@@ -138,17 +145,23 @@ class ClinicTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             p=Path(d)/'state.json';a=PracticeRuntime('patient','patient-a',p);b=PracticeRuntime('patient','patient-b',p)
             self.assertEqual(len(a.call('get_my_appointments',{})['appointments']),2);self.assertEqual(len(b.call('get_my_appointments',{})['appointments']),1)
-    def test_runtime_launcher_tool_removal(self):
-        with patch('launch.shutil.which',return_value='/test/claude'), patch('launch.subprocess.run',return_value=SimpleNamespace(stdout='--restricted --tools --strict-mcp-config --setting-sources --disable-slash-commands')):
-            cmd=command('patient')
-        self.assertEqual(cmd[cmd.index('--tools')+1],'');self.assertIn('--restricted',cmd);self.assertIn('--strict-mcp-config',cmd)
-        config=json.loads(cmd[cmd.index('--mcp-config')+1]);self.assertEqual(set(config['mcpServers']),{'clinic'});self.assertNotIn('doctor',config['mcpServers']['clinic']['args'])
-    def test_launcher_missing_capability_fails_closed(self):
-        with patch('launch.shutil.which',return_value='/test/claude'), patch('launch.subprocess.run',return_value=SimpleNamespace(stdout='--tools')):
-            with self.assertRaises(RuntimeError):command('patient')
-    def test_environment_secret_scrub(self):
-        import os
-        os.environ['GOOGLE_REFRESH_TOKEN']='CANARY';self.assertNotIn('GOOGLE_REFRESH_TOKEN',environment());del os.environ['GOOGLE_REFRESH_TOKEN']
+    def test_native_guard_denies_machine_tools(self):
+        from tool_guard import decide
+        for role in ('patient','doctor'):
+            for name in ('Bash','Read','Write','apply_patch','exec_command','WebFetch','spawn_agent','read_mcp_resource','mcp__other__get_token'):
+                self.assertFalse(decide(role,{'tool_name':name}))
+    def test_native_guard_separates_roles(self):
+        from tool_guard import decide
+        for name in PATIENT:self.assertTrue(decide('patient',{'tool_name':'mcp__clinic__'+name}))
+        for name in DOCTOR:self.assertFalse(decide('patient',{'tool_name':'mcp__clinic__'+name}))
+    def test_doctor_can_book_configured_patient(self):
+        args={'patient_reference':'patient-b','start':self.slot,'request_id':'doctor-book-0001'}
+        r=self.confirm(self.doc,'doctor_book_appointment',args)
+        self.assertTrue(r['calendar_confirmed'])
+        ident=r['appointment']['id'];self.assertNotIn(ident,{e['id'] for e in self.a.call('get_my_appointments',{})['appointments']})
+        self.assertIn(ident,{e['id'] for e in self.b.call('get_my_appointments',{})['appointments']})
+    def test_doctor_cannot_invent_patient_identity(self):
+        with self.assertRaises(ValueError):self.doc.call('doctor_book_appointment',{'patient_reference':'unknown','start':self.slot,'request_id':'doctor-book-0001'})
     def test_audit_does_not_trust_configuration(self):
         self.assertEqual(inventory('', 'patient')['status'],'unverified')
         stream=json.dumps({'type':'system','subtype':'init','tools':['Bash'],'mcp_servers':[{'status':'connected'}]})

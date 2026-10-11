@@ -1,4 +1,4 @@
-"""Minimal stdio MCP. Identity is supplied by trusted launcher, never tool arguments."""
+"""Minimal stdio MCP. Identity is fixed by native MCP configuration, never tool arguments."""
 import json,sys,traceback
 from pathlib import Path
 from core import ROOT, Service, Identity, PATIENT, DOCTOR, ARGUMENTS, atomic, lock

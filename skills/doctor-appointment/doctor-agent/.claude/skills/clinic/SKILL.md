@@ -1,7 +1,6 @@
 ---
 name: clinic
 description: Guide authorized clinic schedule management and reporting.
-disable-model-invocation: true
 ---
 Use authenticated clinic management tools. Review conflicts before blocking or
 rescheduling and obtain explicit confirmation. Persist validated configuration

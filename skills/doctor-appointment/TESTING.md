@@ -1,46 +1,44 @@
-# Published validation and consumer checks
+# Version 0.2.0 verification
 
-Release 0.1.0 bundles the tools, tests, native agent folders, configuration example,
-OAuth helpers, privacy/security documents and gateway contract. No `.venv`, local
-practice state, Google configuration, OAuth client or credentials are published.
+This release uses native Codex and Claude instructions/skills/configuration. It
+removes `launch.py` and adds doctor-side booking through the shared scheduler.
+No credentials, native auth links, local sample database or runtime logs ship.
 
-Maintainer validation on macOS, Python 3.14.2, Claude Code 2.1.296:
+Publisher checks:
 
-- 56 Doctor Appointment tests passed, including mock Google API boundaries.
-- 116 existing Drive Detox tests passed after adding the new skill.
-- Skill frontmatter validation passed.
-- Consumer smoke check passed without Google or a model API.
-- Actual native CLI inventory audit: six patient tools and thirteen doctor tools,
-  connected narrow MCP, no built-in shell/file/web tools or forbidden probe calls.
-- macOS Keychain backend available; process/credential ACL isolation unverified.
-- Google OAuth and live API writes not performed; live operation remains disabled.
+- 59 offline unit/security/API-boundary tests, and 116 existing Drive Detox tests.
+- Native skill validation and offline consumer smoke.
+- Codex 0.162.1 effective app-server configuration, role instructions/skills,
+  six/fourteen-method MCP inventories and OS read/write/network denial probes.
+- Claude Code 2.1.296 actual tool inventories: approved Skill plus six/fourteen
+  role methods; no shell/file/web built-ins.
+- Actual native Codex patient and doctor booking conversations, including separate
+  request/confirmation turns and trusted synthetic write verification.
 
-`references/validation.json` records SHA-256 hashes of distributed files and actual
-runtime observations. `scripts/verify_package.py` checks those hashes in under a
-second. The manifest checks consistency with the fetched release, not authenticity
-against a compromised publisher; pin the raw URL and clone to a trusted Git commit
-for repeatability. It excludes itself and generated runtime files.
+`references/validation.json` contains publisher results and file hashes.
+`scripts/verify_package.py` checks consistency with that release, not authenticity
+against a compromised publisher. Pin a trusted Git commit for repeatability.
+The full suite runs in CI on Python 3.11 and 3.14 without model/Google calls.
 
-Maintainers run regression tests when changing code. GitHub CI repeats them on
-Python 3.11 and 3.14 without Claude login, Google credentials or API calls. Unit
-launcher tests use a simulated CLI; only the separate native CLI audit establishes
-actual tools. CI never claims it verified a user's runtime security.
-
-Consumers do not need to rebuild the scheduling logic or rerun the full suite.
-Run integrity verification and `tools/smoke.py`, then audit **their** Claude runtime
-once when launching the agents. Google authorization, selected resource access,
-Keychain behavior, interactive policy and gateway identity are machine-specific
-and cannot be inherited from maintainer test results. Repeat an audit after CLI
-updates or policy changes. If tests are desired or code is modified:
+Consumers use hash verification and `tools/smoke.py`, then run a local native
+runtime audit. They do not rebuild tools or repeat the entire suite. Google consent,
+Keychain behavior, trusted identity and effective permissions are machine-specific;
+prior publisher tests cannot verify them on another machine. Re-audit after runtime
+or policy changes. For changed code, run maintainer regressions with the shipped
+locked API dependencies:
 
 ```sh
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-Fresh consumer evaluation is conducted after publication: remove publisher-created
-build copies, start in a new folder, give an independent subagent only the public
-skill URL and a normal setup request, and verify it downloads the entire bundle,
-uses the shipped tools, demonstrates practice mode and reports exact launch
-commands and security limits. The evaluator must not access live Google data or
-modify the remote repository. Record its result in the maintainer handoff rather
-than editing the tested release solely to announce that it was tested.
+The optional `tests/run_native_sessions.py` uses real Codex sessions and model
+connectivity but only synthetic fixtures; it preserves conversation state across
+booking and confirmation. It changes shared practice appointments and writes a
+local `config/native-e2e-report.json`. Do not run it against Google resources.
+The runtime audit also uses model calls for Claude and controlled synthetic probes.
+Native auth must be prepared first. No live Google success is claimed.
+
+A fresh-folder subagent evaluates the pinned public skill after publication,
+verifies the downloaded bundle, discovers native role skills/config, and exercises
+actual synthetic Codex sessions. No source/receipt edits or full-suite rerun are
+needed. The maintainer handoff records the fresh evaluation result.

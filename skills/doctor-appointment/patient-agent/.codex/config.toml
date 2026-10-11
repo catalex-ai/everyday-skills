@@ -1,0 +1,52 @@
+approval_policy = "never"
+default_permissions = "clinic"
+web_search = "disabled"
+project_doc_max_bytes = 32768
+
+[features]
+shell_tool = false
+apps = false
+plugins = false
+browser_use = false
+browser_use_external = false
+in_app_browser = false
+computer_use = false
+image_generation = false
+view_image = false
+multi_agent = false
+multi_agent_v2 = false
+code_mode = false
+code_mode_host = true
+goals = false
+memories = false
+request_permissions_tool = false
+tool_suggest = false
+hooks = true
+
+[permissions.clinic.filesystem]
+":minimal" = "read"
+
+[permissions.clinic.filesystem.":workspace_roots"]
+"AGENTS.md" = "read"
+"CLAUDE.md" = "read"
+".agents" = "read"
+".claude/skills" = "read"
+".codex" = "deny"
+
+[permissions.clinic.network]
+enabled = false
+
+[mcp_servers.clinic]
+command = "python3"
+args = ["../tools/server.py", "--role", "patient"]
+required = true
+default_tools_approval_mode = "approve"
+startup_timeout_sec = 20
+enabled_tools = ["book_my_appointment", "cancel_my_appointment", "get_available_slots", "get_clinic_information", "get_my_appointments", "reschedule_my_appointment"]
+
+[[hooks.PreToolUse]]
+matcher = ".*"
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "python3 ../tools/tool_guard.py --role patient"
+timeout = 5

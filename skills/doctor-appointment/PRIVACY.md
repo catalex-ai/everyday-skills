@@ -19,14 +19,14 @@ are handled only by the human-owned helper. Avoid shell debugging/tracing during
 OAuth. HTTP/API error bodies and traceback details are not passed to the model.
 Revocation attempts Google's revoke endpoint and then removes Keychain credentials.
 
-“Local-first” describes configuration, helper and offline fixtures. Native Claude
-terminal conversation/tool results still go to the configured Claude model provider.
+“Local-first” describes configuration, helper and offline fixtures. Native Codex/Claude
+terminal conversation/tool results still go to their configured model provider.
 Google operations communicate with Google when human-invoked OAuth/access checks
-run. CLI session transcripts may persist in Claude's own storage even with prompt
-history disabled; this launcher does not claim to disable all transcript retention.
+run. CLI session transcripts may persist in each runtime's own storage; native
+configuration does not claim to disable all transcript retention.
 Do not use real data until provider contracts, retention and access controls are
 reviewed and the security blockers are resolved. Clearing synthetic state does
-not clear existing Claude transcripts or Google resources.
+not clear existing model-provider transcripts or Google resources.
 
 The application shares the macOS user's privilege level. Keychain availability
 has been checked; separate-process ACL isolation has not. Real-patient mode stays

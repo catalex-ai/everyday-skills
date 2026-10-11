@@ -1,6 +1,16 @@
 {
   "permissions": {
     "defaultMode": "dontAsk",
+    "disableBypassPermissionsMode": "disable",
+    "allow": [
+      "mcp__clinic__book_my_appointment",
+      "mcp__clinic__cancel_my_appointment",
+      "mcp__clinic__get_available_slots",
+      "mcp__clinic__get_clinic_information",
+      "mcp__clinic__get_my_appointments",
+      "mcp__clinic__reschedule_my_appointment",
+      "Skill(appointments)"
+    ],
     "deny": [
       "Bash",
       "PowerShell",
@@ -13,9 +23,26 @@
       "WebSearch",
       "Agent",
       "NotebookEdit",
-      "Skill",
       "ToolSearch"
     ]
   },
-  "disableAllHooks": true
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ../tools/tool_guard.py --role patient",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "allowUnsandboxedCommands": false,
+    "failIfUnavailable": true
+  }
 }

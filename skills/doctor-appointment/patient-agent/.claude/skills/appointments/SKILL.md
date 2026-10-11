@@ -1,7 +1,6 @@
 ---
 name: appointments
 description: Guide owned appointment requests through the restricted clinic tools.
-disable-model-invocation: true
 ---
 Check available slots, retrieve only authenticated own appointments, and ask the
 human to confirm the exact action before submitting an action-bound confirmation

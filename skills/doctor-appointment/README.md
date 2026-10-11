@@ -1,113 +1,146 @@
-# Doctor Assistant: two local Claude Code terminals
+# Doctor Assistant: two native agent terminals
 
-**Prebuilt synthetic practice package; real-patient mode is disabled.**
-Tested on macOS with Claude Code 2.1.296 and Python 3.14; CI repeats offline regression tests. Claude or Codex can fetch this skill and prepare the same shipped tools.
-The patient/doctor runtime uses native Claude Code. No Codex restricted runtime,
-application, separate installer or hosted service is included.
+**Prebuilt package for Codex and Claude Code. Synthetic scheduling works; live
+patient mode remains disabled.** No Python launcher, application or installer.
+The patient and doctor folders contain native instructions, skills, permissions
+and separate narrow MCP surfaces backed by one shared Python scheduler.
 
-Give your coding assistant this prompt:
+Give your creation assistant this prompt:
 
 > Read https://raw.githubusercontent.com/catalex-ai/everyday-skills/main/skills/doctor-appointment/SKILL.md
-> and use the prebuilt package to set up Doctor Assistant in this workspace.
-> Demonstrate offline patient isolation, then give me the two restricted terminal
-> launch commands. Do not regenerate the tools or enable real-patient mode.
+> and create the two native Doctor Assistant sessions here using the prebuilt tools.
+> Demonstrate patient/doctor booking and ask whether I want Google authorization now.
 
-The assistant clones the public repository and copies this **whole folder** to
-`doctor-assistant/`. Downloading SKILL.md alone omits the implementation. Record
-or pin the fetched Git commit for repeatable results; the final maintainer handoff
-also supplies an immutable raw URL. Existing installations are never overwritten.
-See [SKILL.md](SKILL.md) for assistant instructions and [TESTING.md](TESTING.md)
-for published test evidence and checks needed on a new machine.
+The assistant downloads the **whole folder**, verifies published hashes, runs a
+quick offline compatibility check, prepares native login/config and audits your
+chosen runtime. It does not regenerate tools or repeat publisher tests. The original
+creation session may have developer permissions; the patient session does not.
 
-Patient tools check slots, book, show only owned appointments, cancel/reschedule,
-and answer configured administrative questions. Doctor tools view schedules,
-configure the clinic, block/unblock time, review conflicts and reconcile reporting.
-Both use `tools/core.py`. Google Calendar is the intended authoritative live source;
-Sheets is only reporting. Offline practice uses shared, synthetic mock state.
+## Prepare once
 
-## Launch the two terminals
-
-After the assistant copies the package to `doctor-assistant/`, prepare dependencies
-once from your workspace root (the assistant can execute these development commands):
+After copying the bundle to `doctor-assistant/`, from your workspace root:
 
 ```sh
 python3 doctor-assistant/scripts/verify_package.py
 python3 doctor-assistant/tools/smoke.py
-python3 -m venv doctor-assistant/.venv
-doctor-assistant/.venv/bin/python -m pip install -r doctor-assistant/requirements.lock.txt
+python3 doctor-assistant/tools/admin.py native-prepare
 ```
 
-Offline practice can use Python 3.11+ without `.venv` or Google dependencies.
-For the following two terminals, start from your workspace root:
+`native-prepare` is a trusted configuration/auth operation, not a session launcher.
+It links your existing protected native Codex auth file into the two isolated
+`.codex` homes without reading/copying its contents. If no existing login exists,
+run `CODEX_HOME="$PWD/.codex" codex login` in each role folder. Native Claude uses
+its existing login. No Google credentials are needed for practice.
 
-Terminal 1:
+## Codex: two native terminals
+
+Terminal 1, from your workspace root:
 
 ```sh
 cd doctor-assistant/patient-agent
-../.venv/bin/python ../tools/launch.py --role patient
+CODEX_HOME="$PWD/.codex" codex --no-daemon --strict-config --dangerously-bypass-hook-trust
 ```
 
 Terminal 2:
 
 ```sh
 cd doctor-assistant/doctor-agent
-../.venv/bin/python ../tools/launch.py --role doctor
+CODEX_HOME="$PWD/.codex" codex --no-daemon --strict-config --dangerously-bypass-hook-trust
 ```
 
-Patient B, in place of Patient A:
+Codex natively loads `AGENTS.md`, `.agents/skills/appointments` or `clinic`, and
+`.codex/config.toml`. The scoped home prevents inherited user MCP/plugins/settings.
+The native clinic permission profile grants only minimal runtime files and role
+instructions/skills read access; it denies config/credential reads, all writes
+and command networking. Shell, browser, apps, plugins, image/file viewing,
+subagents and permission-request tools are disabled. MCP is restricted to the
+role's approved clinic methods. A native PreToolUse guard rejects other local tools.
+Codex may still advertise `apply_patch`; native permissions reject its writes.
+Its sandboxed Code Mode may orchestrate approved tools; this does not grant shell,
+filesystem or unrestricted network access.
+
+The hook-trust flag runs only the integrity-checked shipped guard without a second
+trust dialog. **It does not bypass approvals or sandboxing.** Alternatively review
+and trust it in `/hooks`, then omit this flag. Do not use the unrelated
+`--dangerously-bypass-approvals-and-sandbox`. This is tested on Codex 0.162.1;
+unsupported versions must fail the audit rather than weaken the profile.
+
+Synthetic Patient B, instead of A, adds this native config override:
 
 ```sh
-../.venv/bin/python ../tools/launch.py --role patient --patient patient-b
+CODEX_HOME="$PWD/.codex" codex --no-daemon --strict-config --dangerously-bypass-hook-trust -c 'mcp_servers.clinic.args=["../tools/server.py","--role","patient","--patient","patient-b"]'
 ```
 
-**Do not substitute plain `claude`.** Native folder instructions, skills and MCP
-configuration exist, but folder configuration alone is not security isolation.
-The launcher starts native Claude Code with `--restricted --tools ""`,
-`--strict-mcp-config`, explicit role-specific MCP, empty setting sources,
-`dontAsk`, no Chrome, disabled hooks/skill execution, and a fail-closed Bash
-sandbox. It provides the agent instructions explicitly, scrubs inherited secret
-environment variables and accepts no extra Claude flags. Your existing Claude
-subscription login is used; practice requires no Google credentials. Interactive
-Claude sessions require Claude's normal model connection. The offline practice
-commands below need neither network nor an external model API.
+This explicit local test identity is not authentication for live patients.
 
-Native skills are retained as workflow references; execution is disabled in the
-restricted sessions to avoid loading other local customizations. The launcher
-provides equivalent workflows in the explicit system prompt.
+## Claude Code: the same two folders
 
-## Offline practice and tests
-
-From your workspace root:
+In either role folder, run this native command:
 
 ```sh
-python3 doctor-assistant/tools/admin.py practice-reset
+claude --restricted --tools Skill --strict-mcp-config --mcp-config .mcp.json --setting-sources "" --settings .claude/settings.json --permission-mode dontAsk --no-chrome
+```
+
+Claude imports `AGENTS.md` via `CLAUDE.md` and discovers `.claude/skills`.
+Only the role's skill and clinic MCP operations are authorized. Shell/file/web
+built-ins are removed, hooks allow only that role's tools, and the fail-closed
+Bash sandbox cannot retry outside its boundary. Native skills are used directly.
+Tested on Claude Code 2.1.296. Plain `claude` or `codex` in a folder does not prove
+permissions isolation; use the exact native command for the chosen runtime.
+
+## Practice and verification
+
+```sh
 python3 doctor-assistant/tools/admin.py practice-demo
-doctor-assistant/.venv/bin/python -m unittest discover -s doctor-assistant/tests -v
-python3 doctor-assistant/tools/admin.py audit
+python3 doctor-assistant/tools/audit.py --runtime codex
+python3 doctor-assistant/tools/audit.py --runtime claude
 ```
 
-Reset only synthetic state; do not reset while sessions are carrying pending
-confirmations. Fixture date is the next working day in Asia/Kolkata. Patient A
-sees `a-demo` and `cancelled-demo`; B sees only `b-demo`. The doctor sees the two
-active appointments and `blocked-demo`. The first register sync fails deliberately;
-the second succeeds. A repeated sync must have three historical appointment rows.
+The fixture uses the next working day in Asia/Kolkata. Patient A has `a-demo` and
+`cancelled-demo`; B has `b-demo`; the doctor sees both active appointments and a
+blocked range. First mock Sheets synchronization deliberately fails; retry succeeds.
+`doctor_verify_synthetic_appointment` runs an isolated booking/cancellation/isolation
+check without changing shared practice state. `doctor_book_appointment` books for
+configured Patient A/B through the same scheduler, with action-bound confirmation.
 
-Patient phrases: “Show my appointments”, “Show available slots on [fixture date]”,
-“Book the first available slot”, “Cancel my appointment”, “What is the address?”
-Doctor phrases: “Show [fixture date]'s schedule”, “Set appointment duration to 20
-minutes”, “Block [fixture date] 11:00–12:00”, “Sync the register”, “Review issues”, “Run synthetic appointment verification”.
-Respond to displayed confirmation proposals explicitly. Do not use real patient
-names, contacts, appointment IDs or diagnoses in practice.
+Patient phrases: “Show my appointments”, “Book tomorrow at 14:00”, “Cancel my
+appointment”, “What is the clinic address?” Doctor phrases: “Show tomorrow's
+schedule”, “Book Patient B tomorrow at 16:00”, “Set duration to 20 minutes”,
+“Block tomorrow 11:00–12:00”, “Sync the register”. Explicitly confirm displayed
+proposals. Never enter real patient data in practice.
 
-Configuration is conversational through `doctor_configure_clinic`: name, timezone,
-working days (Monday=0), hours, breaks, duration, buffer, address, contact, resource
-IDs and policies. Trusted code validates and persists it. Practice configuration
-is separate from `config/google-clinic.json`. No manual YAML/source edits needed.
+Configuration is conversational through doctor_configure_clinic: name, timezone,
+working days (Monday=0), hours, breaks, duration, buffers, address/contact, resource
+IDs and policies. Trusted code validates and persists it. Practice JSON is separate
+from Google configuration; it is only the mock adapter's local sample database.
+The live design uses Calendar as appointment truth, not that file or Sheets.
 
-## Connect Google from a human-owned terminal
+An opt-in maintainer test actually starts native Codex sessions in both folders,
+books one synthetic appointment through each role, views the doctor's schedule,
+and verifies Patient B's isolated list:
+
+```sh
+python3 doctor-assistant/tests/run_native_sessions.py
+```
+
+This uses your Codex model connection and changes only synthetic practice state.
+Full offline regressions are included for maintainers and CI. Consumers need only
+integrity, smoke and their local runtime audit. See TESTING.md.
+
+## Connect Google during creation
+
+The creation skill asks whether to connect Google now or stay in offline practice.
+Only the human's choice starts authorization. Prepare optional Google dependencies
+from your workspace root (the creation assistant can do this):
+
+```sh
+python3 -m venv doctor-assistant/.venv
+doctor-assistant/.venv/bin/python -m pip install -r doctor-assistant/requirements.lock.txt
+```
+
 
 OAuth setup and access checks can run without enabling live appointments. These
-commands are **not MCP tools**; the human must run them outside the Claude prompt.
+commands are **not MCP tools**; the human must run them outside the patient/doctor sessions.
 Do not paste credential contents or tokens into chat.
 
 1. In [Google Cloud Console](https://console.cloud.google.com/), create/select a
@@ -185,25 +218,28 @@ history and marks review required. Logical cancellation retains the Calendar
 record, marks private clinic status `cancelled`, and makes it transparent; it
 does not delete audit history. Reconciliation never rolls back Calendar bookings.
 
-## Enforced controls and remaining limits
+## Verified restrictions and remaining limits
 
-Maintainer CLI probes showed exactly **6 patient tools** and **13 doctor tools**, no
-built-in machine/file/network tools, connected role-specific MCP, and no forbidden
-probe calls. See [SECURITY.md](SECURITY.md) and `references/validation.json` for
-published evidence and limits; your local audit writes `config/audit-report.json`. These are actual observed inventories, not just configuration checks.
-The mock suite checks authorization, isolation, injections, leakage, conflicts,
-retry/recovery, timezones and reconciliation. No live API success is claimed.
+See SECURITY.md and references/validation.json for publisher observations. Local
+audits write config/audit-report.json. Codex audit queries the actual app-server
+for effective config, active permissions, instruction/skill discovery and live
+MCP inventory, then verifies denial of synthetic outside-folder reads, writes and
+network access. Claude audit captures actual native model tool inventories.
+A restriction is not passed merely because a setting exists in a file.
 
-The narrow MCP helper runs as the same macOS user; the Bash sandbox does not
-isolate MCP or the Claude process. Keychain backend availability was verified;
-ACL isolation was not. No trusted CatalEx gateway was available. Confirmation
-tokens do not prove human approval. Tool inventories were verified for print-mode
-sessions, not every future interactive/plugin/managed-settings combination. Claude
-itself still communicates with Anthropic. Calendar lacks atomic reservations;
-external writers can race a recheck. Google freebusy cannot safely subtract one
-appointment, so live reschedules overlapping the original slot are conservatively
-rejected. Direct removal of ownership metadata requires doctor review.
+These checks do not certify the entire Codex built-in schema, all future interactive
+policy changes, same-UID process isolation, Keychain ACLs, independently proven human
+consent or trusted live clinic identity. Native shell/file tools are restricted;
+MCP and hooks run in the trusted helper boundary outside the command sandbox.
+A person with administrative OS access or native permission controls can change
+configuration. A terminal exposed to untrusted humans needs managed policy and
+OS account boundaries before real-patient use. No configuration file can replace
+those boundaries. Real mode stays gated in trusted code.
 
-Accordingly real-patient use and the live test remain blocked. This is a tested
-practice implementation with Google adapters and OAuth tooling, **not the full
-production definition of done**. Published code contains no tokens, local state or patient records.
+Google authorization has not been performed. Google connection during creation
+requires a Desktop OAuth client and browser consent; live Calendar/Sheets writes
+remain unverified. Calendar has no atomic reservation guarantee, external writers
+can race rechecks, and overlapping live reschedules are conservatively rejected.
+The staged real-resource synthetic verification is still gated by unresolved
+security prerequisites. This is a working native practice package, not certification
+for real patient data. Nothing sensitive is published.

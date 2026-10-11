@@ -3,4 +3,7 @@ __pycache__/
 config/practice-state.*
 config/google-clinic.json
 config/audit*.json
+config/native-e2e-report.json
 *.log
+**/.codex/*
+!**/.codex/config.toml

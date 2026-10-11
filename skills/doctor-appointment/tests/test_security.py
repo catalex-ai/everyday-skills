@@ -45,6 +45,14 @@ class ClinicTests(unittest.TestCase):
             self.assertNotIn('owner',event)
         with self.assertRaises(Denied):
             self.a.call('doctor_get_appointment',{'appointment_id':'b-demo'})
+    def test_conversational_symmetric_buffer_config(self):
+        self.confirm(self.doc,'doctor_configure_clinic',{'changes':{'duration_minutes':20,'buffer_minutes':5}})
+        self.assertEqual(self.doc.config['buffer_minutes'],5)
+        end=self.day+'T09:30:00+05:30'
+        self.assertFalse(self.doc.available(stamp(end)+timedelta(minutes=4),stamp(end)+timedelta(minutes=24)))
+        self.assertTrue(self.doc.available(stamp(end)+timedelta(minutes=5),stamp(end)+timedelta(minutes=25)))
+        with self.assertRaises(ValueError):
+            self.doc.call('doctor_configure_clinic',{'changes':{'buffer_before_minutes':5}})
     def test_unverified_patient(self):
         with self.assertRaises(Denied):Service(Identity('patient-a','patient','synthetic-clinic','gateway',False),self.cal,self.sheets).call('get_my_appointments',{})
     def test_tool_separation(self):

@@ -273,6 +273,13 @@ class Service:
 
 def schema(properties={},required=()):
     return {'type':'object','properties':{k:({'type':v} if isinstance(v,str) else v) for k,v in properties.items()},'required':list(required),'additionalProperties':False}
+CONFIG_CHANGES=schema({
+    **{k:{'type':'string'} for k in DEFAULT if k not in ('clinic_id','working_days','breaks','duration_minutes','buffer_minutes')},
+    'working_days':{'type':'array','items':{'type':'integer','minimum':0,'maximum':6},'minItems':1,'description':'Monday=0 through Sunday=6.'},
+    'breaks':{'type':'array','items':{'type':'array','items':{'type':'string'},'minItems':2,'maxItems':2},'description':'Pairs of local HH:MM start/end times.'},
+    'duration_minutes':{'type':'integer','minimum':5,'maximum':240,'description':'Appointment length in minutes.'},
+    'buffer_minutes':{'type':'integer','minimum':0,'maximum':240,'description':'Symmetric clearance before AND after each appointment. Five minutes before and after means 5, not 10. Separate before/after settings are unsupported.'}
+})
 ARGUMENTS={
  'get_available_slots':schema({'day':'string','preferred_start':'string'},['day']), 'get_my_appointments':schema(),
  'get_clinic_information':schema(),
@@ -282,7 +289,7 @@ ARGUMENTS={
  'doctor_book_appointment':schema({'patient_reference':{'type':'string','enum':['patient-a','patient-b']},'start':'string','request_id':'string','confirmation_token':'string'},['patient_reference','start','request_id']),
  'doctor_get_schedule':schema({'day':'string'},['day']),
  'doctor_get_appointment':schema({'appointment_id':'string'},['appointment_id']),
- 'doctor_configure_clinic':schema({'changes':'object','confirmation_token':'string'},['changes']),
+ 'doctor_configure_clinic':schema({'changes':CONFIG_CHANGES,'confirmation_token':'string'},['changes']),
  'doctor_block_time':schema({'start':'string','end':'string','confirmation_token':'string'},['start','end']),
  'doctor_unblock_time':schema({'appointment_id':'string','confirmation_token':'string'},['appointment_id']),
  'doctor_cancel_appointment':schema({'appointment_id':'string','confirmation_token':'string'},['appointment_id']),

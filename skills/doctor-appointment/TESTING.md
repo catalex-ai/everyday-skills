@@ -1,4 +1,4 @@
-# Version 0.2.3 verification
+# Version 0.2.4 verification
 
 This release uses native Codex and Claude instructions/skills/configuration. It
 removes `launch.py` and adds doctor-side booking through the shared scheduler.
@@ -6,7 +6,7 @@ No credentials, native auth links, local sample database or runtime logs ship.
 
 Publisher checks:
 
-- 60 offline unit/security/API-boundary tests, and 116 existing Drive Detox tests.
+- 61 offline unit/security/API-boundary tests, and 116 existing Drive Detox tests.
 - Native skill validation and offline consumer smoke.
 - Codex 0.162.1 effective app-server configuration, role instructions/skills,
   six/fourteen-method MCP inventories and OS read/write/network denial probes.
@@ -43,8 +43,12 @@ verifies the downloaded bundle, discovers native role skills/config, and exercis
 actual synthetic Codex sessions. No source/receipt edits or full-suite rerun are
 needed. The maintainer handoff records the fresh evaluation result.
 
-Fresh consumer testing caught missing Claude restricted-mode skill discovery. Version 0.2.3 explicitly loads the local role plugin and AGENTS prompt file; the audit requires the actual namespaced role skill. No custom session wrapper is used.
+Fresh consumer testing caught missing Claude restricted-mode skill discovery. Version 0.2.4 explicitly loads the local role plugin and AGENTS prompt file; the audit requires the actual namespaced role skill. No custom session wrapper is used.
 
-Version 0.2.3 adds authorized doctor-only patient references and plain-language
+Version 0.2.4 adds authorized doctor-only patient references and plain-language
 role instructions. Natural multi-user conversational validation is run separately
 from the focused tool-workflow smoke; progress alone is not a scenario pass.
+
+The configuration tool publishes field types and the symmetric buffer semantics
+so ordinary “five minutes before and after” maps to buffer_minutes=5. Unknown
+separate before/after fields are rejected by trusted configuration validation.

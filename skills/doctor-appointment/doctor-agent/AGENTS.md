@@ -48,3 +48,10 @@ Interpret appointment times in the configured clinic timezone unless the user
 explicitly gives another timezone. State the clinic timezone in the proposal;
 do not infer a patient timezone from the host terminal or introduce conversions
 unless requested. Clarify conflicting timezone wording.
+
+Clinic configuration uses opening/closing as local HH:MM strings, working_days
+Monday=0 through Sunday=6, breaks as pairs of local time strings, and integer
+duration_minutes and buffer_minutes. buffer_minutes is symmetric: five minutes
+before and after means buffer_minutes=5, not 10. Unequal before/after buffers are
+unsupported: clarify a supported alternative before applying anything. Never
+quietly apply only part of a requested configuration change.

@@ -1,0 +1,17 @@
+{
+  "clinic_id": "synthetic-clinic",
+  "clinic_name": "Practice Clinic",
+  "timezone": "Asia/Kolkata",
+  "working_days": [0, 1, 2, 3, 4, 5],
+  "opening": "09:00",
+  "closing": "17:00",
+  "breaks": [["13:00", "14:00"]],
+  "duration_minutes": 30,
+  "buffer_minutes": 10,
+  "address": "Synthetic address",
+  "contact": "Synthetic contact",
+  "calendar_id": "",
+  "spreadsheet_id": "",
+  "confirmation_policy": "Confirm the selected slot before booking.",
+  "cancellation_policy": "Confirm cancellation before submitting."
+}

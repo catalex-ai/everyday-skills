@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+config/practice-state.*
+config/google-clinic.json
+config/audit*.json
+*.log

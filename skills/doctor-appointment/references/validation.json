@@ -1,0 +1,125 @@
+{
+  "version": "0.1.0",
+  "tested_at": "2026-10-11T13:10:12.420181+00:00",
+  "environment": {
+    "python": "3.14.2",
+    "os": "macOS",
+    "claude": "2.1.296 (Claude Code)"
+  },
+  "tests": {
+    "doctor_appointment": {
+      "passed": 56,
+      "failed": 0
+    },
+    "existing_drive_detox": {
+      "passed": 116,
+      "failed": 0
+    },
+    "skill_validation": "passed",
+    "offline_smoke": "passed"
+  },
+  "runtime_audit": {
+    "time": "2026-10-11T13:10:12.420181+00:00",
+    "cli_version": "2.1.296 (Claude Code)",
+    "mode": "synthetic-only",
+    "sessions": {
+      "patient": {
+        "status": "passed",
+        "actual_tools": [
+          "mcp__clinic__book_my_appointment",
+          "mcp__clinic__cancel_my_appointment",
+          "mcp__clinic__get_available_slots",
+          "mcp__clinic__get_clinic_information",
+          "mcp__clinic__get_my_appointments",
+          "mcp__clinic__reschedule_my_appointment"
+        ],
+        "unexpected_tools": [],
+        "missing_tools": [],
+        "mcp_connected": true,
+        "probe_tool_calls": [
+          "mcp__clinic__get_clinic_information"
+        ],
+        "forbidden_probe_call_observed": false,
+        "exit_code": 0
+      },
+      "doctor": {
+        "status": "passed",
+        "actual_tools": [
+          "mcp__clinic__doctor_block_time",
+          "mcp__clinic__doctor_cancel_appointment",
+          "mcp__clinic__doctor_configure_clinic",
+          "mcp__clinic__doctor_connection_status",
+          "mcp__clinic__doctor_get_appointment",
+          "mcp__clinic__doctor_get_schedule",
+          "mcp__clinic__doctor_open_spreadsheet",
+          "mcp__clinic__doctor_reschedule_appointment",
+          "mcp__clinic__doctor_review_issues",
+          "mcp__clinic__doctor_sync_register",
+          "mcp__clinic__doctor_sync_status",
+          "mcp__clinic__doctor_unblock_time",
+          "mcp__clinic__doctor_verify_synthetic_appointment"
+        ],
+        "unexpected_tools": [],
+        "missing_tools": [],
+        "mcp_connected": true,
+        "probe_tool_calls": [
+          "mcp__clinic__doctor_connection_status"
+        ],
+        "forbidden_probe_call_observed": false,
+        "exit_code": 0
+      }
+    },
+    "real_patient_enabled": false,
+    "os_process_isolation": {
+      "status": "unverified",
+      "reason": "CLI tool removal does not isolate same-UID processes or Keychain ACLs"
+    },
+    "gateway_identity": {
+      "status": "unverified",
+      "reason": "No trusted CatalEx gateway supplied"
+    },
+    "human_confirmation_provenance": {
+      "status": "unverified",
+      "reason": "Confirmation tokens bind actions, but an LLM can submit them without human consent"
+    },
+    "google_live_verification": {
+      "status": "unverified",
+      "reason": "No consented Google verification performed"
+    }
+  },
+  "secure_storage_backend": "macOS Keychain available; credential ACL isolation unverified",
+  "google_live_verified": false,
+  "files": {
+    ".gitignore": "56e8e83cf6b89d3f93868c8f3e7b04ea047b10b2f6eedac79e30c658af4bcd54",
+    "GATEWAY.md": "e3791e5f21b6c5c47b79be74e62e4f3b79754d9b354346a873413a376dce17e3",
+    "PRIVACY.md": "43c0946418a5d8d933e9540656a71e4e9f64b8a8cecca9bf60b73583a0dc83c2",
+    "README.md": "410fdeaa90f3e6ce2e215c66b8f7095200502d2b2fcf42b8fa14fe092e4572b7",
+    "SECURITY.md": "8bd6bc5a332eca3c390a348a62c64b835054ea42010652c1ecb6be1976b1798f",
+    "SKILL.md": "af780aa7131efa5a8aa7e032fe1eb0d27aec6ee519532a5799d007ae10700c66",
+    "TESTING.md": "ced8d1c8186b37bd1d953e6eb565df794e438f4a93b66ed0ed88313e0f473cf6",
+    "agents/openai.yaml": "87c4fb2e7ae5c787fc467ab6255e8b773c4933c7955c05954406e1b6d147feee",
+    "config/clinic.example.json": "07a1a904520b04c5ae68a7210c44c2b79b335e5546b137c754163b13ba6a85b0",
+    "doctor-agent/.claude/settings.json": "b0dc4604f1975d7b04f5ea061f999728c3a1c6d63273f72a1ac4dcc4e0fe4837",
+    "doctor-agent/.claude/skills/clinic/SKILL.md": "9df56cb5357a54617298ebd95374030c3db7743d22967ba1759d09fec2f45368",
+    "doctor-agent/.mcp.json": "4bcca5eeb1c003ff3a9f0835348df02c044167f810c7c55e21b50ce529024d25",
+    "doctor-agent/CLAUDE.md": "a924e7ac4677903bcb8a0b81f6a9f3200a497b19ea936e41d363d3f5a622fc83",
+    "patient-agent/.claude/settings.json": "b0dc4604f1975d7b04f5ea061f999728c3a1c6d63273f72a1ac4dcc4e0fe4837",
+    "patient-agent/.claude/skills/appointments/SKILL.md": "c04bf3084587485712c169f718452ac4da02cf0c379c2370a1a4764788132fcd",
+    "patient-agent/.mcp.json": "9e21a4ce9776295fd4d2127b1d8a7476b020ab9e9c5e3623eb60b057befefc28",
+    "patient-agent/CLAUDE.md": "0f429d27b23d94501a182bff730ab8f1912b649d3ad46fce64ccd9cbc857bf61",
+    "requirements.lock.txt": "1dc25320144415bdd46885647dec8d3d19b34a6e41ac93ee8cb1d5c33d3e1ae3",
+    "requirements.txt": "9a51ae3dbcbd7b051abe42a46244254e5d6d2c4ce1b80299beebd5671e002c63",
+    "scripts/verify_package.py": "f56f48291637e80dc5f6fdeb2d5f468748056917c82c6cb0b5beb363fbe78e49",
+    "tests/test_adapters.py": "9f4fda461a00ac0ab7046cfe905ba82bd7c306a6d28ee1999553055e5b6556d4",
+    "tests/test_security.py": "b1db9a4bee2a7c8a6213fb6a48966f95536184228710484908eee948a6fcda8b",
+    "tools/admin.py": "1901ca3267474f77739ad46e345e441ceb260e447813a7007b13d0a9c0e3786a",
+    "tools/audit.py": "69cf25b88d758a040c15cf8d6acbeba0e0aa0d80a8cc668e56e94ba90dcad87a",
+    "tools/core.py": "63f7493899f80d2074f242dff198c95bae38e99f76d26d54fc17206484079f2a",
+    "tools/google_adapter.py": "4d41976517bbbc614cadfad32c861492bfa1f0cf23a18150c8ea29ba894c98de",
+    "tools/launch.py": "baffa9fc647a819ee8eec6de99f16990a7892c32caa0e4aeabc40fc6a5f1945f",
+    "tools/mock.py": "119477cf6f1d8e06a93604769f1d1daa8c5be4cdb0e0a1582082775a096d6d68",
+    "tools/server.py": "0da488bd14db106d09b1ba8d84fb614f43dec16e4dd358dee81eb7d2d18a1151",
+    "tools/smoke.py": "030288321eeef95981bfd3e6bb7be74fc91c847038b186051405032087345287",
+    "tools/verification.py": "36b5bf6d67b71d8e6590f35169a28e729bb3889bab6e1dfba2c6b47930a3b920"
+  }
+}

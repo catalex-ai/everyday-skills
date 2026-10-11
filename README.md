@@ -7,9 +7,14 @@ An open-source collection of practical AI workflows for everyday life and work.
 ## Skills
 | Skill | Outcome | Status |
 |---|---|---|
+| [Doctor Appointment](skills/doctor-appointment/README.md) | Prebuilt tools and two restricted Claude Code terminals for patient and doctor appointment practice. | Offline synthetic mode; Google OAuth helpers included; real-patient mode blocked pending identity and OS-boundary verification |
 | [Drive Detox](skills/drive-detox/README.md) | Audit a local folder or Google Drive read-only: biggest files, stale files, duplicate groups, and a cleanup plan you approve before anything moves. | Local mode works out of the box; Drive mode needs a `drive.readonly` token or your own MCP connection |
 
 ## Getting started
+For Doctor Appointment, give Claude or Codex the [raw skill instructions](https://raw.githubusercontent.com/catalex-ai/everyday-skills/main/skills/doctor-appointment/SKILL.md).
+The assistant downloads the accompanying tested tools; no installer is required.
+See the [Doctor Appointment guide](skills/doctor-appointment/README.md).
+
 Not technical? Start with the Drive Detox [walkthrough](skills/drive-detox/WALKTHROUGH.md).
 
 ```bash

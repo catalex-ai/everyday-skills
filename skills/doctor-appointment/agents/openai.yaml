@@ -1,0 +1,4 @@
+interface:
+  display_name: "Doctor Appointment"
+  short_description: "Prebuilt clinic agents with isolated synthetic practice"
+  default_prompt: "Use $doctor-appointment to prepare the prebuilt Doctor Assistant and demonstrate patient isolation in offline practice."

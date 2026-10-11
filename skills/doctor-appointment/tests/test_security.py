@@ -24,6 +24,20 @@ class ClinicTests(unittest.TestCase):
     def test_patient_isolation(self):
         self.assertEqual({e['id'] for e in self.a.call('get_my_appointments',{})['appointments']},{'a-demo','cancelled-demo'})
         self.assertEqual([e['id'] for e in self.b.call('get_my_appointments',{})['appointments']],['b-demo'])
+    def test_public_clinic_hours_exclude_resource_identifiers(self):
+        self.a.config['calendar_id']='private-calendar'
+        self.a.config['spreadsheet_id']='private-register'
+        info=self.a.call('get_clinic_information',{})
+        self.assertEqual(info['opening'],self.a.config['opening'])
+        self.assertEqual(info['breaks'],self.a.config['breaks'])
+        self.assertNotIn('calendar_id',info);self.assertNotIn('spreadsheet_id',info)
+        info['working_days'].clear()
+        self.assertTrue(self.a.config['working_days'])
+    def test_clinic_today_uses_configured_timezone(self):
+        fixed=datetime(2026,10,11,20,30,tzinfo=ZoneInfo('UTC'))
+        clock=SimpleNamespace(now=lambda zone:fixed.astimezone(zone))
+        with patch('core.datetime',clock):
+            self.assertEqual(self.a.call('get_clinic_information',{})['clinic_today'],'2026-10-12')
     def test_guessed_id_denied(self):
         for t in ('cancel_my_appointment','reschedule_my_appointment'):
             args={'appointment_id':'b-demo'}

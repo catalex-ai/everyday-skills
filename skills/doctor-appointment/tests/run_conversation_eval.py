@@ -607,7 +607,7 @@ def main() -> int:
         sync_calls = [c for turn in transcript for c in turn["tool_metadata"] if c.get("tool") == "doctor_sync_register"]
         sync_results = [result for call in sync_calls for result in call.get("structured_results", []) if isinstance(result, dict)]
         block_removed = not any(e.get("kind") == "block" and e.get("start", "").startswith(dates["tuesday"].isoformat() + "T10:00") and e.get("status") == "confirmed" for e in events)
-        appointment_ids = {e.get("id") for e in events}
+        appointment_ids = {e.get("id") for e in events if e.get("kind") == "appointment"}
         no_dups = (set(records) == appointment_ids and len(records) == len(appointment_ids)
                    and len({(e.get("owner"), e.get("start")) for e in events if e.get("kind") == "appointment" and e.get("status") == "confirmed"}) == len([e for e in events if e.get("kind") == "appointment" and e.get("status") == "confirmed"]))
         thursday_unconfirmed = not any(e.get("owner") == "patient-b" and e.get("start", "").startswith(dates["thursday"].isoformat() + "T14:00") for e in events)

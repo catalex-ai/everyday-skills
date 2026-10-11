@@ -204,7 +204,9 @@ class Service:
         if tool=='book_my_appointment':return self.book(**args)
         if tool=='cancel_my_appointment':return self.change('cancel',args['appointment_id'],token=args.get('confirmation_token'))
         if tool=='reschedule_my_appointment':return self.change('reschedule',args['appointment_id'],args['start'],args.get('confirmation_token'))
-        if tool=='get_clinic_information':return {k:self.config[k] for k in ('clinic_name','timezone','address','contact','confirmation_policy','cancellation_policy')}
+        if tool=='get_clinic_information':
+            public=('clinic_name','timezone','working_days','opening','closing','breaks','duration_minutes','buffer_minutes','address','contact','confirmation_policy','cancellation_policy')
+            return copy.deepcopy({k:self.config[k] for k in public})|{'clinic_today':datetime.now(ZoneInfo(self.config['timezone'])).date().isoformat()}
         if tool=='doctor_book_appointment':
             from mock import MockCalendar
             if not isinstance(self.cal,MockCalendar):raise Denied('Trusted live patient directory not configured')

@@ -117,3 +117,8 @@ Google [Desktop OAuth](https://developers.google.com/identity/protocols/oauth2/n
 [extended-property filtering](https://developers.google.com/workspace/calendar/api/guides/extended-properties),
 [Calendar events](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert),
 and [Sheets values](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/update).
+
+Doctor schedule/detail/block-conflict outputs include the appointment owner’s
+patient reference after doctor authorization, so the model can resolve patient
+requests without guessing. Patient outputs omit references and ownership fields.
+Neither output includes contact details or raw descriptions.

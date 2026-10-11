@@ -75,6 +75,12 @@ def public_event(e):
     # No raw event summary/description/contact data reaches an agent.
     return {k:copy.deepcopy(e[k]) for k in ('id','start','end','status','kind') if k in e}
 
+def doctor_event(e):
+    result=public_event(e)
+    if e.get("kind")=="appointment" and e.get("owner"):
+        result["patient_reference"]=e["owner"]
+    return result
+
 class Service:
     def __init__(self, identity, calendar, sheets, config=None, config_path=None):
         self.identity, self.cal, self.sheets = identity, calendar, sheets
@@ -207,8 +213,8 @@ class Service:
             return patient.book(args['start'],args['request_id'],args.get('confirmation_token'))
         if tool=='doctor_get_schedule':
             day=date.fromisoformat(args['day']);z=ZoneInfo(self.config['timezone']);a=datetime.combine(day,time(),z)
-            return {'appointments':[public_event(e) for e in self.cal.schedule(a,a+timedelta(days=1))]}
-        if tool=='doctor_get_appointment':return public_event(self.managed(args['appointment_id']))
+            return {'appointments':[doctor_event(e) for e in self.cal.schedule(a,a+timedelta(days=1))]}
+        if tool=='doctor_get_appointment':return doctor_event(self.managed(args['appointment_id']))
         if tool=='doctor_configure_clinic':
             patch=args['changes']
             if set(patch)-set(DEFAULT) or 'clinic_id' in patch:raise ValueError('Unknown or immutable field')
@@ -223,7 +229,7 @@ class Service:
             a,b=stamp(args['start']),stamp(args['end'])
             if b<=a or b-a>timedelta(days=7):raise ValueError('Invalid block range')
             conflicts=self.cal.schedule(a,b)
-            payload={'start':a.isoformat(),'end':b.isoformat(),'conflicts':[public_event(e) for e in conflicts]}
+            payload={'start':a.isoformat(),'end':b.isoformat(),'conflicts':[doctor_event(e) for e in conflicts]}
             needed=self.confirm('block',payload,args.get('confirmation_token'))
             if needed:return needed
             ident=hashlib.sha256(f'block:{self.identity.clinic}:{a.isoformat()}:{b.isoformat()}'.encode()).hexdigest()

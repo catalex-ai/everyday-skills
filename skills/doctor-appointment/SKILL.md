@@ -108,3 +108,10 @@ results, practice outcomes, and Google steps requiring human action. Published
 regressions travel with the code; new-machine runtime permissions and OAuth cannot
 be inherited from publisher results. Codex built-in schema completeness and human
 terminal policy changes are not fully verified. Keep real-patient mode blocked.
+
+For conversational validation, set synthetic A/B identity in native startup
+configuration, then use ordinary patient and doctor messages with no tool names,
+request IDs, tokens or test directions. Interleave separate sessions across several
+dates for booking, conflicts, rescheduling, cancellations and doctor hours/blocks;
+verify persisted state and patient isolation independently of model claims. Keep
+exact transcripts and report failures, including recovery attempts.

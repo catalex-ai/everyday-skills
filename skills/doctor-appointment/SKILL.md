@@ -51,6 +51,9 @@ settings and `.mcp.json`. Restricted auto-discovery on the tested build omitted 
 Native flags and a scoped Codex home are required to avoid inheriting unrestricted
 user settings/tools; merely opening a folder and typing a bare CLI name is not
 proof of isolation. Never relax restrictions to fix failed setup.
+Use the supplied trusted helper interpreter bootstrap; a venv may share its resolved
+Python binary with system Python. Check environment identity with `sys.prefix`, not
+resolved `sys.executable`, and never improvise a new startup fix during installation.
 
 Codex terminal commands, from each role folder:
 

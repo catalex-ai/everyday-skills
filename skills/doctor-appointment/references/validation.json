@@ -289,7 +289,7 @@
     "Patient Assistant.command": "0f6d9fc43442205006019ce9ba52ba07e47538478e17f43216de6c4e11922e54",
     "README.md": "b4fcfaf80c55bd2ef77b6886b9df69b3d8d3e79e806d5b9dad6e3e2f3612929e",
     "SECURITY.md": "016167a7896cfc811ef21ce80893624d2c0895b8d86324716b5425b3326cd2f7",
-    "SKILL.md": "a0ee5c2a0100a1e6fbb03ca6b616af4be645cf00d6df7081ad98b609c668187a",
+    "SKILL.md": "169122cc6c3d8135a1404c98f970901dd1301b2726926479373d228247d66439",
     "TESTING.md": "df22dc3a856569c4b31f21f0f031d3d2dc8454b08740d9114c441590075763cd",
     "agents/openai.yaml": "5327bc3e3c27b2dde5c2b7486ec2fdb0f8b4c3a878b82f2d0260c5d52329d5ca",
     "config/clinic.example.json": "07a1a904520b04c5ae68a7210c44c2b79b335e5546b137c754163b13ba6a85b0",
@@ -318,7 +318,7 @@
     "requirements.txt": "9a51ae3dbcbd7b051abe42a46244254e5d6d2c4ce1b80299beebd5671e002c63",
     "scripts/verify_package.py": "f56f48291637e80dc5f6fdeb2d5f468748056917c82c6cb0b5beb363fbe78e49",
     "start.sh": "72b5dd433dafe086c33c1fb3056e034a9abbf7869c3f93ac9d41f335f275798a",
-    "tests/EVAL_SPEC.md": "832f371083b9b6d1b82217485b9cbfe9dcb6d0a265121bca6368565c9d7d7290",
+    "tests/EVAL_SPEC.md": "f471b4392a4a2b6055d65c917dd59e370199a055476251dfd025f744c5f807fc",
     "tests/claude_session.py": "9a73fb71a85f4a6eb35ca9ba38cd7399539916ac7c83531fd7dcc2a173ccf7d4",
     "tests/run_conversation_eval.py": "ecdb2337b99ecfa9fdfcd00d3a2a38b2e082ef7f87cb1ccc0d4265aa758d6322",
     "tests/run_native_sessions.py": "bb68acb705f60578236cad393c83d240a27f55d867df11687e687a5691683b0c",
@@ -332,11 +332,13 @@
     "tools/core.py": "c4e99df7410b696d7342a97260bd29f5bbdf8aa92502e0840a1d6eff9c34c74e",
     "tools/google_adapter.py": "6cdfa9a45e2682677c209f1902c43085a88a5ec249636c80cc09519ac4570ccf",
     "tools/mock.py": "119477cf6f1d8e06a93604769f1d1daa8c5be4cdb0e0a1582082775a096d6d68",
-    "tools/server.py": "3ced2bbf2a29f7997fa9481762a6d52bd142728d616f37b09ed5b4384a1bf315",
+    "tools/server.py": "7906a5d53c764b8fdd3029d40160c3e29eb351644642da62be9516d117c0ba2a",
     "tools/smoke.py": "030288321eeef95981bfd3e6bb7be74fc91c847038b186051405032087345287",
     "tools/tool_guard.py": "389c2e63ea276aff9087063f9363f9dcd03f82bc3542786d75d206ca6fd18da7",
     "tools/verification.py": "36b5bf6d67b71d8e6590f35169a28e729bb3889bab6e1dfba2c6b47930a3b920",
-    "references/setup-wizard.md": "8467008524fc18433b5a9fda73afc67a7721e98fdbd438329d8e7b3a09eaa6b3"
+    "references/setup-wizard.md": "8467008524fc18433b5a9fda73afc67a7721e98fdbd438329d8e7b3a09eaa6b3",
+    "tools/runtime_python.py": "b1940c4110160bcc41c0b51d042bc72a5b8f40aeb041e99f095a9ba1813f4320",
+    "tests/test_runtime_python.py": "c6d4b71aa1a3cc1360171fef12ab3cb2d7f655aa02ecfd9a11e64efa7c035f20"
   },
   "fresh_consumer": {
     "codex_native_bookings": "passed",
@@ -372,5 +374,20 @@
     "date": "2026-10-12",
     "scope": "Setup Q&A, automatic Google activation contract and current runtime blocker disclosure",
     "validation": "skill validator and package integrity; existing runtime test results unchanged"
+  },
+  "startup_regression_update": {
+    "date": "2026-10-12",
+    "published_offline_tests": {
+      "passed": 99,
+      "failed": 0
+    },
+    "installed_live_extension_isolated_offline_tests": {
+      "passed": 116,
+      "failed": 0
+    },
+    "scope": "Published interpreter bootstrap; local live extension status/startup fixes",
+    "google_calls_performed": false,
+    "new_native_permission_audit_performed": false,
+    "previous_audit_is_historical": true
   }
 }

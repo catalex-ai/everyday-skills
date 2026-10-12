@@ -46,6 +46,8 @@ def serve(role,patient):
             print(json.dumps({'jsonrpc':'2.0','id':None,'error':{'code':-32600,'message':'Invalid request'}}),flush=True)
 
 if __name__=='__main__':
+    from runtime_python import ensure_package_interpreter
+    ensure_package_interpreter(ROOT)
     import argparse
     p=argparse.ArgumentParser();p.add_argument('--role',choices=['patient','doctor'],required=True);p.add_argument('--patient',choices=['patient-a','patient-b'],default='patient-a')
     a=p.parse_args();serve(a.role,a.patient)

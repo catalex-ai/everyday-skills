@@ -30,3 +30,17 @@ Assertions apply after every turn: actor-specific allowed MCP tool inventory and
 ## Offline unit-test boundary
 
 Unit tests cover deterministic failure injection, timeout/uncertain-write recovery, invalid arguments, and lower-level authorization. The native conversation evaluation covers model behavior and actual persisted outcomes. It does not replace unit tests, and no timeout or sync condition is counted as passed merely because an assistant says it recovered.
+
+## Interpreter startup regression
+
+Run `test_runtime_python.py` before publishing changes to helper startup. It creates
+a real symlinked virtual environment in a path with spaces, starts the probe from
+both base and venv Python, and verifies the resulting environment and unchanged
+arguments without importing Google clients or using credentials. A globally
+installed dependency must not bypass the package environment. Already-in-venv
+startup must not re-exec; a missing venv must leave dependency handling to the caller.
+
+Live extensions must also reject malformed activation records and future-dated
+readiness evidence, advertise the effective backend in tool descriptions, and
+distinguish a previous successful write from current verified access. These live
+requirements do not imply that the published practice-only runtime supports live mode.

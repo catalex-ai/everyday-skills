@@ -287,9 +287,9 @@
     "GATEWAY.md": "e3791e5f21b6c5c47b79be74e62e4f3b79754d9b354346a873413a376dce17e3",
     "PRIVACY.md": "38171e5340673d3f0d93fe6c1b1fb6cf62606aa8426001a186611c037ba4f1f6",
     "Patient Assistant.command": "0f6d9fc43442205006019ce9ba52ba07e47538478e17f43216de6c4e11922e54",
-    "README.md": "ffad1accb767b4e58e8aabc9daa1d47d7cbbff01b79319b1de2a099097c1592b",
+    "README.md": "b4fcfaf80c55bd2ef77b6886b9df69b3d8d3e79e806d5b9dad6e3e2f3612929e",
     "SECURITY.md": "016167a7896cfc811ef21ce80893624d2c0895b8d86324716b5425b3326cd2f7",
-    "SKILL.md": "99a36a93c30e9119d0139756506cc50ab83c85dd6f9dbebb745b3b79255483bf",
+    "SKILL.md": "a0ee5c2a0100a1e6fbb03ca6b616af4be645cf00d6df7081ad98b609c668187a",
     "TESTING.md": "df22dc3a856569c4b31f21f0f031d3d2dc8454b08740d9114c441590075763cd",
     "agents/openai.yaml": "5327bc3e3c27b2dde5c2b7486ec2fdb0f8b4c3a878b82f2d0260c5d52329d5ca",
     "config/clinic.example.json": "07a1a904520b04c5ae68a7210c44c2b79b335e5546b137c754163b13ba6a85b0",
@@ -335,7 +335,8 @@
     "tools/server.py": "3ced2bbf2a29f7997fa9481762a6d52bd142728d616f37b09ed5b4384a1bf315",
     "tools/smoke.py": "030288321eeef95981bfd3e6bb7be74fc91c847038b186051405032087345287",
     "tools/tool_guard.py": "389c2e63ea276aff9087063f9363f9dcd03f82bc3542786d75d206ca6fd18da7",
-    "tools/verification.py": "36b5bf6d67b71d8e6590f35169a28e729bb3889bab6e1dfba2c6b47930a3b920"
+    "tools/verification.py": "36b5bf6d67b71d8e6590f35169a28e729bb3889bab6e1dfba2c6b47930a3b920",
+    "references/setup-wizard.md": "8467008524fc18433b5a9fda73afc67a7721e98fdbd438329d8e7b3a09eaa6b3"
   },
   "fresh_consumer": {
     "codex_native_bookings": "passed",
@@ -366,5 +367,10 @@
     "patient_labels_in_doctor_summary": "passed after explicit instruction refinement",
     "details": "references/fresh-clone-validation.json",
     "google_accessed": false
+  },
+  "documentation_update": {
+    "date": "2026-10-12",
+    "scope": "Setup Q&A, automatic Google activation contract and current runtime blocker disclosure",
+    "validation": "skill validator and package integrity; existing runtime test results unchanged"
   }
 }

@@ -9,7 +9,8 @@ Give your creation assistant this prompt:
 
 > Read https://raw.githubusercontent.com/catalex-ai/everyday-skills/main/skills/doctor-appointment/SKILL.md
 > and create the two native Doctor Assistant sessions here using the prebuilt tools.
-> Demonstrate patient/doctor booking and ask whether I want Google authorization now.
+> Guide me through the short setup Q&A. Check live readiness before asking for Google
+> authorization; do not silently leave an authorized clinic using mock appointments.
 
 The assistant downloads the **whole folder**, verifies published hashes, runs a
 quick offline compatibility check, prepares native login/config and audits your
@@ -170,8 +171,11 @@ integrity, smoke and their local runtime audit. See TESTING.md.
 
 ## Connect Google during creation
 
-The creation skill asks whether to connect Google now or stay in offline practice.
-Only the human's choice starts authorization. Prepare optional Google dependencies
+The creation skill uses a [short Q&A](references/setup-wizard.md) and checks the actual
+backend before requesting consent. This release cannot activate Google scheduling:
+authorization only connects and verifies resources. Practice requires an explicit
+choice. Once live support is implemented and verified, successful setup must select
+Google automatically without an additional activation step. Prepare optional Google dependencies
 from your workspace root (the creation assistant can do this):
 
 ```sh

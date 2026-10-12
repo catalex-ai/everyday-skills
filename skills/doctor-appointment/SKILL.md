@@ -68,31 +68,33 @@ MCP argument override, documented in README; chat claims never change identity.
 Claude's exact native restricted command is in README. Do not use a custom session
 wrapper or offer unrestricted developer sessions as patient terminals.
 
-## Offer Google authorization during creation
+## Set up through a short Q&A
 
-After the offline demonstration, ask whether the user wants **Google connection
-now** or **offline practice only**. Ask once as part of this creation workflow,
-not only after they discover missing auth during booking. If they choose Google,
-inspect non-secret config, prepare optional Google dependencies in PACKAGE/.venv using requirements.lock.txt, and follow README's Google Cloud steps. Do independent
-work while waiting; never treat silence as consent to an OAuth or Google write.
+For a clinic setup request, use [the setup wizard contract](references/setup-wizard.md).
+Ask one useful question at a time; execute supported preparation operations yourself.
+Do not require the doctor to run commands, find resource IDs, or create an OAuth app
+when a publisher-provided client is available. Never imply that such a client exists
+without checking. Practice is an explicit choice, not the default after Google consent.
 
-The human creates a Desktop OAuth client, enables Calendar/Sheets APIs and
-approves browser consent. Guided setup lists writable calendars by name and
-offers a new spreadsheet or an existing spreadsheet URL; it saves IDs internally. They provide the
-local client JSON path, never its contents/tokens. Use the trusted `google-setup --client PATH` helper from the original setup terminal;
-these may be launched by the coding assistant with a PTY so the human can complete
-terminal/browser actions. Never expose those operations to the patient agent or
-read authorization secrets into chat. The helper completes a loopback callback,
-stores the refresh token in macOS Keychain and reports only success/access checks.
-Do not silently fall back to plaintext storage. OAuth authenticates the app,
-not the clinic role.
+Before opening consent, inspect the installed server's actual backend and live
+readiness. This version's `tools/server.py` always constructs `PracticeRuntime`;
+`tools/admin.py` gates live writes. It cannot activate Google scheduling. Report
+that setup is blocked before soliciting authorization for a working clinic. Offer
+connection-only setup only if the user explicitly requests it knowing this limit.
+Do not describe a successful connection as a working appointment setup.
 
-The package currently enables only synthetic scheduling. Google connection and
-resource selection, setup-only register creation and access checks are implemented, but live booking remains gated pending trusted
-live identity, independent confirmation and OS credential-boundary verification.
-Say this before asking the user to invest in Google setup. No real Google success
-may be claimed without successful API calls. The user can exercise doctor-side
-booking with synthetic Patient A/B now; future live IDs require a trusted directory.
+When a future implementation passes live identity and runtime-boundary checks,
+verified Google authorization and resource selection must automatically activate
+its Google backend for both roles. Require no separate activation question or
+manual config edits. Confirm activation by inspecting the running backend and
+verified Google reads. If activation fails, stop setup with the concrete blocker;
+never silently use mocks or weaken permissions. Booking remains subject to the
+normal appointment confirmation and confirmed Calendar write.
+
+OAuth belongs to the trusted setup helper, outside both agent tool surfaces.
+Use a supported browser/loopback flow and OS credential storage. Do not read client
+JSON contents or tokens into chat, impersonate patient identity using OAuth, or
+silently fall back to plaintext credentials. See README for existing helper commands.
 
 ## Use and report
 

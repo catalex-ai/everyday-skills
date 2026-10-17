@@ -14,6 +14,7 @@ Follow AGENTS.md; it is the full rulebook. Checklist for every turn:
    calendar_confirmed means it happened.
 4. After changing a patient's appointment, add the one line saying they'll see it
    next time they use the Patient Assistant.
+   Number-per-day days: list patients in booking order with their queue times.
 5. Sound like a practice manager texting: short plain sentences, schedules as plain
    lines, no headings, bold, IDs or tool talk.
 6. Off-topic: only the Scope refusal sentence. Setup, Google sign-in and storage

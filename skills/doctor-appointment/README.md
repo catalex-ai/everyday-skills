@@ -14,7 +14,11 @@ Give your coding assistant this prompt:
 It installs the prebuilt tools, asks a few plain questions (clinic name, hours,
 set appointment times or a number of patients per day, where to keep bookings,
 and for Google which calendar and spreadsheet) and tells you how to open both
-assistants. You do not run any commands.
+assistants. You do not run any commands. For a number per day, one number is
+enough ("10 a day"); a new-patient/follow-up split is optional. Choosing Google
+needs a one-time sign-in file (see "Google sign-in file") and one browser
+sign-in. When setup asks "Claude or Codex?", Claude runs both assistants on
+Haiku.
 
 Real-patient sign-in is not available yet: the Patient Assistant works with two
 test patients, Patient A and Patient B.
@@ -26,6 +30,10 @@ Both talk like a person at the front desk: short plain messages, a simple
 
 **Patient Assistant** (one patient's own appointments only):
 - Shows free times and the patient's appointments; books, moves and cancels.
+- One appointment a day per patient: asking for a second time that day gets an
+  offer to move the existing one instead.
+- In number-per-day clinics, talks only in days ("You're booked for Tuesday the
+  20th"), never clock times.
 - Explains why a time can't be booked (closed, taken, or not one of the clinic's
   set times) and offers the nearest ones.
 - Opens with any change the clinic made since the patient last visited ("The
@@ -40,14 +48,30 @@ Both talk like a person at the front desk: short plain messages, a simple
   unblocks time, showing any appointments a block overlaps.
 - Changes hours, working days, breaks, appointment length, buffer and booking
   mode, and checks for appointments the change would affect.
-- In number-per-day mode, reports how full each day is and asks whether to take
-  more patients when a day fills up.
+- In number-per-day mode, shows each day's queue in booking order with times
+  (5:00, 5:05, …), reports how full the day is, changes the minutes per patient,
+  and asks whether to take more patients when a day fills up.
+- Can book a second appointment for a patient on the same day if asked.
 - Syncs and reviews the appointment spreadsheet.
 
 Try: Patient: "What's free on Tuesday?", "Book me Tuesday at 10:20", "Move my
 appointment to Friday", "Cancel my appointment". Doctor: "Show tomorrow's
 schedule", "Book Patient B Tuesday at 3", "Block Thursday 2 to 4", "Set
-appointments to 20 minutes", "From now on, 10 patients a day", "On Friday I'll take 15", "Sync the register".
+appointments to 20 minutes", "From now on, 10 patients a day", "Give each
+patient 8 minutes", "On Friday I'll take 15", "Sync the register".
+
+### Things to check after setup
+
+1. Doctor Assistant: "Show tomorrow's schedule".
+2. Patient Assistant (Patient A): book a day or time, say yes, then ask for a
+   second time the same day; it should offer to move instead of booking twice.
+3. Number-per-day clinics: book Patient A and Patient B on the same day, then ask
+   the Doctor Assistant for that day. They're listed in booking order, 5 minutes
+   apart from opening time; in Google Calendar each is a 5-minute event.
+4. Fill a day (or set "on Friday I'll take 1") and book again: the patient is
+   offered other days, and the Doctor Assistant's next reply asks whether to take
+   more.
+5. Cancel one booking: the next booking still goes to the end of the queue.
 
 ### Set times or a number of patients per day
 
@@ -113,13 +137,14 @@ the calendar or spreadsheet. Switching does not copy existing bookings.
 doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py status
 doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py clinic-settings --set clinic_name="Example Clinic" --set opening=09:00
 doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py use-laptop
-doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py list-calendars
-doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py google-setup --calendar "Clinic" --new-register "Clinic appointments" [--client PATH]
+doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py list-calendars [--client PATH]
+doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py google-setup --calendar "Clinic" --new-register "Clinic appointments"
 doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py activate
 ```
 
-`google-setup` reuses a working sign-in stored in macOS Keychain; `--client` is
-needed only for the first sign-in. `--register-url LINK` uses an existing
+The first `list-calendars --client PATH` opens the browser sign-in and keeps it
+in macOS Keychain; `google-setup` and later commands reuse it (pass `--client` to
+`google-setup` only if there is no working sign-in). `--register-url LINK` uses an existing
 spreadsheet instead of creating one. `activate` reads the chosen calendar and
 spreadsheet once and switches both assistants to Google. Google mode is bound to
 those two resources: if they change or the sign-in stops working, every request

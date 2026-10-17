@@ -12,11 +12,71 @@ Give your coding assistant this prompt:
 > and set up the Doctor Assistant here.
 
 It installs the prebuilt tools, asks a few plain questions (clinic name, hours,
-where to keep bookings, and for Google which calendar and spreadsheet) and tells
-you how to open both assistants. You do not run any commands.
+set appointment times or a number of patients per day, where to keep bookings,
+and for Google which calendar and spreadsheet) and tells you how to open both
+assistants. You do not run any commands.
 
 Real-patient sign-in is not available yet: the Patient Assistant works with two
 test patients, Patient A and Patient B.
+
+## What the assistants do
+
+Both talk like a person at the front desk: short plain messages, a simple
+"Shall I book it?" before any change, and nothing happens until you say yes.
+
+**Patient Assistant** (one patient's own appointments only):
+- Shows free times and the patient's appointments; books, moves and cancels.
+- Explains why a time can't be booked (closed, taken, or not one of the clinic's
+  set times) and offers the nearest ones.
+- Opens with any change the clinic made since the patient last visited ("The
+  clinic changed your appointment from Mon 19 Oct, 9:00 am to Tue 20 Oct, 11:00 am.").
+- Answers questions about the clinic's hours, address, phone and policies.
+- Refuses anything else, including other people's appointments, and never gives
+  medical advice (possible emergencies are told to call 112 first).
+
+**Doctor Assistant** (the whole clinic's book):
+- Shows any day's schedule with patient labels and blocked time.
+- Books for Patient A or B; moves or cancels any appointment; blocks and
+  unblocks time, showing any appointments a block overlaps.
+- Changes hours, working days, breaks, appointment length, buffer and booking
+  mode, and checks for appointments the change would affect.
+- In number-per-day mode, reports how full each day is and asks whether to take
+  more patients when a day fills up.
+- Syncs and reviews the appointment spreadsheet.
+
+Try: Patient: "What's free on Tuesday?", "Book me Tuesday at 10:20", "Move my
+appointment to Friday", "Cancel my appointment". Doctor: "Show tomorrow's
+schedule", "Book Patient B Tuesday at 3", "Block Thursday 2 to 4", "Set
+appointments to 20 minutes", "From now on, 10 consultations and 5 follow-ups a
+day", "On Friday I'll take 15", "Sync the register".
+
+### Set times or a number of patients per day
+
+A clinic runs in one of two booking modes, chosen in setup and changeable later
+by telling the Doctor Assistant:
+
+- **Set times** (default): patients pick from the clinic's appointment times.
+- **Number per day**: no times. The doctor sets how many first consultations and
+  follow-ups a day takes ("10 consultations and 5 follow-ups a day"), and can
+  change one day ("on Thursday I'll take 15"). Patients book a place on a day;
+  returning patients count as follow-ups automatically and new patients are asked.
+  When a day fills up, the booking that took the last place records an alert in
+  `config/doctor-alerts.json` (for a messaging connector to pick up) and the
+  Doctor Assistant's next reply asks the doctor whether to take more that day.
+  Patients asking for a full day are offered the next days with room.
+
+### Patients hear about clinic changes
+
+Each appointment remembers the time the patient last agreed to. When the clinic
+moves, cancels or books an appointment for a patient (through the Doctor
+Assistant, or by editing or deleting the event directly in Google Calendar), the
+patient's next request to the Patient Assistant first returns only a plain
+notice, e.g. "The clinic moved your appointment from Tue 13 Oct, 4:05 pm to
+Wed 14 Oct, 10:00 am.", which the assistant tells them before anything else.
+Each change is delivered once (`config/notices-seen.json`). There is no
+email/SMS: patients learn about it the next time they use the assistant.
+Bookings made before this version only report direct deletions until the
+doctor first changes them through the assistant.
 
 ## Open an assistant
 
@@ -63,34 +123,6 @@ updates do not turn Google mode off. `google-revoke` signs out and turns it off.
 
 Each Google write (book, move, cancel, block, settings) needs a click on the
 macOS "Doctor Assistant approval" pop-up, which the assistants cannot press.
-
-### Set times or a number of patients per day
-
-A clinic runs in one of two booking modes, chosen in setup and changeable later
-by telling the Doctor Assistant:
-
-- **Set times** (default): patients pick from the clinic's appointment times.
-- **Number per day**: no times. The doctor sets how many first consultations and
-  follow-ups a day takes ("10 consultations and 5 follow-ups a day"), and can
-  change one day ("on Thursday I'll take 15"). Patients book a place on a day;
-  returning patients count as follow-ups automatically and new patients are asked.
-  When a day fills up, the booking that took the last place records an alert in
-  `config/doctor-alerts.json` (for a messaging connector to pick up) and the
-  Doctor Assistant's next reply asks the doctor whether to take more that day.
-  Patients asking for a full day are offered the next days with room.
-
-### Patients hear about clinic changes
-
-Each appointment remembers the time the patient last agreed to. When the clinic
-moves, cancels or books an appointment for a patient (through the Doctor
-Assistant, or by editing or deleting the event directly in Google Calendar), the
-patient's next request to the Patient Assistant first returns only a plain
-notice, e.g. "The clinic moved your appointment from Tue 13 Oct, 4:05 pm to
-Wed 14 Oct, 10:00 am.", which the assistant tells them before anything else.
-Each change is delivered once (`config/notices-seen.json`). There is no
-email/SMS: patients learn about it the next time they use the assistant.
-Bookings made before this version only report direct deletions until the
-doctor first changes them through the assistant.
 
 ### Google sign-in file
 
@@ -202,11 +234,8 @@ blocked range. First mock Sheets synchronization deliberately fails; retry succe
 check without changing shared practice state. `doctor_book_appointment` books for
 configured Patient A/B through the same scheduler, with action-bound confirmation.
 
-Patient phrases: “Show my appointments”, “Book tomorrow at 14:00”, “Cancel my
-appointment”, “What is the clinic address?” Doctor phrases: “Show tomorrow's
-schedule”, “Book Patient B tomorrow at 16:00”, “Set duration to 20 minutes”,
-“Block tomorrow 11:00–12:00”, “Sync the register”. Explicitly confirm displayed
-proposals. Never enter real patient data in practice.
+Use the phrases under "What the assistants do" and confirm each proposal
+explicitly. Never enter real patient data in practice.
 
 Configuration is conversational through doctor_configure_clinic: name, timezone,
 working days (Monday=0), hours, breaks, duration, buffers, address/contact, resource
@@ -251,6 +280,26 @@ Google access. They save redacted transcripts and objective fixture checks. See
 booking and doctor visibility on both models. Passing a finite scenario does
 not establish perfect conversation quality or authorize real-patient use.
 Full offline regressions are included for maintainers and CI. See TESTING.md.
+
+### Golden eval suite (Claude Haiku)
+
+A broader scenario suite runs real Haiku Patient and Doctor sessions, several at
+once when a case needs it, each in an isolated synthetic copy of the package
+(never Google). Every turn checks the stored bookings, the tools used, the reply
+(no false confirmations, leaks or bot-style formatting) and the model, and a
+Haiku judge grades each conversation against its expected behaviour:
+
+```sh
+python3 doctor-assistant/evals/golden_eval.py                       # all suites
+python3 doctor-assistant/evals/golden_eval.py --cases B09,X05 --label retry-1
+```
+
+Scenarios live in `tests/scenarios/` (golden set, the end-to-end simulation spec,
+and number-per-day mode); transcripts are written to `tests/conversations/`. A
+live dashboard is written to `evals/dashboard.html` while it runs. Scenarios the
+architecture cannot run (messaging, patient acceptance of doctor proposals,
+fault injection, staff permission tiers) are marked BLOCKED, never passed. See
+[evals/README.md](evals/README.md) and the latest [report](evals/REPORT.md).
 
 
 

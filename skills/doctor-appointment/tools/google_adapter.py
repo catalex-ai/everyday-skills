@@ -80,7 +80,8 @@ class Calendar:
         p=e.get('extendedProperties',{}).get('private',{})
         result={'id':e['id'],'status':'cancelled' if e.get('status')=='cancelled' else p.get('clinicStatus',e.get('status','confirmed')),'kind':p.get('kind','external'),
             'clinic':p.get('clinic'),'owner':p.get('owner'),'etag':e.get('etag'),'clinic_status':p.get('clinicStatus')}
-        if 'agreed' in p:result['agreed']=p['agreed']
+        for k in ('agreed','mode','category'):
+            if k in p:result[k]=p[k]
         for k in ('start','end'):
             v=e.get(k,{})
             if 'dateTime' in v:result[k]=v['dateTime']
@@ -88,7 +89,7 @@ class Calendar:
         return result
     @staticmethod
     def encode(e):
-        private = {k:e[k] for k in ('clinic','kind','owner','agreed') if e.get(k)}
+        private = {k:e[k] for k in ('clinic','kind','owner','agreed','mode','category') if e.get(k)}
         private['clinicStatus'] = e['status']
         if e.get('owner'):
             private['patientScope'] = Calendar.patient_scope(e['clinic'],e['owner'])
@@ -98,7 +99,8 @@ class Calendar:
             # Google status cancelled removes it from the calendar view (it stays
             # retrievable by ID); a visible "free" event looks booked to the doctor.
             'status':'cancelled' if e['status']=='cancelled' else 'confirmed',
-            'transparency':'transparent' if e['status']=='cancelled' else 'opaque',
+            # A count-mode booking is a place for the day, not a time: keep it free in free/busy.
+            'transparency':'transparent' if e['status']=='cancelled' or e.get('mode')=='count' else 'opaque',
             'start':{'dateTime':e['start']}, 'end':{'dateTime':e['end']},
             'extendedProperties':{'private':private}
         }
@@ -168,7 +170,7 @@ class Calendar:
         if cal.get('errors'):raise RuntimeError('Calendar availability unavailable')
         return [(x['start'],x['end']) for x in cal['busy']]
     def review_conflicts(self):
-        now=datetime.now().astimezone();events=self.schedule(now,now+timedelta(days=30));pairs=[]
+        now=datetime.now().astimezone();events=[e for e in self.schedule(now,now+timedelta(days=30)) if e.get('mode')!='count'];pairs=[]
         for i,e in enumerate(events):
             for f in events[i+1:]:
                 if stamp(e['start'])<stamp(f['end']) and stamp(f['start'])<stamp(e['end']):pairs.append([e['id'],f['id']])

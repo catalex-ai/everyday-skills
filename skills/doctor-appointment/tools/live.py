@@ -114,8 +114,9 @@ class LiveRuntime:
         identity = Identity(patient if role == 'patient' else 'synthetic-doctor', role, c['clinic_id'], 'synthetic', True)
         self.service = Service(identity, calendar, sheets, c, config_path=CONFIG,
                                approver=approver or macos_approver(lambda: self.service.config['timezone']), synthetic_directory=True)
-        from core import NoticeLog
+        from core import NoticeLog, AlertLog
         self.service.notices_seen = NoticeLog(ROOT/'config'/'notices-seen.json')
+        self.service.alerts = AlertLog(ROOT/'config'/'doctor-alerts.json')
     def tools(self):
         from core import PATIENT, DOCTOR
         return sorted(PATIENT if self.role == 'patient' else DOCTOR)

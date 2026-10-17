@@ -1,7 +1,7 @@
 """Minimal stdio MCP. Identity is fixed by native MCP configuration, never tool arguments."""
 import json,sys,traceback
 from pathlib import Path
-from core import ROOT, Service, Identity, PATIENT, DOCTOR, ARGUMENTS, NoticeLog, atomic, lock
+from core import ROOT, Service, Identity, PATIENT, DOCTOR, ARGUMENTS, NoticeLog, AlertLog, atomic, lock
 from mock import MockCalendar,MockSheets,fixture
 
 LOCAL_STATE=ROOT/'config'/'local-bookings.json'
@@ -13,6 +13,7 @@ class PracticeRuntime:
         self.role=role;self.path=Path(state_path or ROOT/'config'/'practice-state.json')
         self.service=Service(Identity(patient if role=='patient' else 'synthetic-doctor',role,'synthetic-clinic','synthetic',True),MockCalendar(),MockSheets())
         self.service.notices_seen=NoticeLog(self.path.with_name('notices-seen.json'))
+        self.service.alerts=AlertLog(self.path.with_name('doctor-alerts.json'))
     def tools(self):return sorted(PATIENT if self.role=='patient' else DOCTOR)
     def call(self,name,args):
         # Lock spans read/check/write across both local terminals.

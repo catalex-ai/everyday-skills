@@ -64,6 +64,21 @@ updates do not turn Google mode off. `google-revoke` signs out and turns it off.
 Each Google write (book, move, cancel, block, settings) needs a click on the
 macOS "Doctor Assistant approval" pop-up, which the assistants cannot press.
 
+### Set times or a number of patients per day
+
+A clinic runs in one of two booking modes, chosen in setup and changeable later
+by telling the Doctor Assistant:
+
+- **Set times** (default): patients pick from the clinic's appointment times.
+- **Number per day**: no times. The doctor sets how many first consultations and
+  follow-ups a day takes ("10 consultations and 5 follow-ups a day"), and can
+  change one day ("on Thursday I'll take 15"). Patients book a place on a day;
+  returning patients count as follow-ups automatically and new patients are asked.
+  When a day fills up, the booking that took the last place records an alert in
+  `config/doctor-alerts.json` (for a messaging connector to pick up) and the
+  Doctor Assistant's next reply asks the doctor whether to take more that day.
+  Patients asking for a full day are offered the next days with room.
+
 ### Patients hear about clinic changes
 
 Each appointment remembers the time the patient last agreed to. When the clinic

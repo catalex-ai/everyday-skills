@@ -20,7 +20,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('operation',choices=['status','clinic-settings','use-laptop','list-calendars','google-setup','activate','google-status','google-revoke','open-spreadsheet','hide-cancelled','synthetic-google-test','practice-reset','practice-demo','google-connect','google-configure','audit','native-prepare']);p.add_argument('--client',type=Path);p.add_argument('--start');p.add_argument('--calendar-id');p.add_argument('--spreadsheet-id')
     p.add_argument('--calendar',help='Clinic calendar name as shown in Google Calendar');p.add_argument('--new-register',metavar='TITLE');p.add_argument('--register-url')
     p.add_argument('--runtime',choices=['codex','claude'],help='native-prepare: app the double-click shortcuts open')
-    p.add_argument('--set',action='append',default=[],metavar='FIELD=VALUE',help='clinic-settings: e.g. clinic_name="Dr Rao Clinic" opening=09:00 working_days=[0,1,2,3,4]')
+    p.add_argument('--set',action='append',default=[],metavar='FIELD=VALUE',help='clinic-settings: e.g. clinic_name="Dr Rao Clinic" opening=09:00 working_days=[0,1,2,3,4] booking_mode=count daily_caps=\'{"consultation":10,"follow_up":5}\'')
     a=p.parse_args()
     if a.operation=='status':print(json.dumps(status(),indent=2));return
     if a.operation=='clinic-settings':clinic_settings(a.set);return
@@ -170,7 +170,7 @@ def next_test_slot(calendar,c):
         if day.weekday() in c['working_days'] and (found:=finder.slots(day.isoformat())):return found[-1]
     raise AdminError('No free clinic slot in the next two weeks for the one-time test booking')
 
-SETTINGS=('clinic_name','timezone','working_days','opening','closing','breaks','duration_minutes','buffer_minutes','address','contact','confirmation_policy','cancellation_policy')
+SETTINGS=('clinic_name','timezone','working_days','opening','closing','breaks','duration_minutes','buffer_minutes','address','contact','confirmation_policy','cancellation_policy','booking_mode','daily_caps')
 
 def clinic_settings(pairs):
     """Validated non-secret clinic details, saved for both Google and on-this-computer storage."""
@@ -180,7 +180,7 @@ def clinic_settings(pairs):
     for pair in pairs:
         field,sep,raw=pair.partition('=')
         if not sep or field not in SETTINGS:raise AdminError('Use FIELD=VALUE with one of: '+', '.join(SETTINGS))
-        try:c[field]=json.loads(raw) if field in ('working_days','breaks','duration_minutes','buffer_minutes') else raw
+        try:c[field]=json.loads(raw) if field in ('working_days','breaks','duration_minutes','buffer_minutes','daily_caps') else raw
         except ValueError:raise AdminError(field+' needs a JSON value, e.g. working_days=[0,1,2,3,4] breaks=[["13:00","14:00"]]') from None
     c=validate_config(c);atomic(path,c)
     if LOCAL_STATE.exists():

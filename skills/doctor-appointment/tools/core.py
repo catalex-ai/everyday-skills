@@ -53,10 +53,26 @@ DEFAULT = dict(clinic_id='synthetic-clinic', clinic_name='Practice Clinic', time
     working_days=[0,1,2,3,4,5], opening='09:00', closing='17:00', breaks=[['13:00','14:00']],
     duration_minutes=30, buffer_minutes=10, address='Synthetic address', contact='Synthetic contact',
     calendar_id='', spreadsheet_id='', confirmation_policy='Confirm the selected slot before booking.',
-    cancellation_policy='Confirm cancellation before submitting.')
+    cancellation_policy='Confirm cancellation before submitting.',
+    # 'slots': patients pick a set start time. 'count': the doctor caps how many
+    # consultations and follow-ups a day takes; patients book a place that day.
+    booking_mode='slots', daily_caps={'consultation':10,'follow_up':5}, day_caps={})
+CATEGORIES=('consultation','follow_up')
+COUNT_FIELDS=('booking_mode','daily_caps','day_caps')
+
+def valid_caps(caps,partial=False):
+    if not isinstance(caps,dict) or set(caps)-set(CATEGORIES) or (not partial and set(caps)!=set(CATEGORIES)):raise ValueError('Caps need consultation and follow_up counts')
+    if any(type(v) is not int or not 0<=v<=500 for v in caps.values()):raise ValueError('Caps must be whole numbers from 0 to 500')
 
 def validate_config(c):
+    c = {k:copy.deepcopy(DEFAULT[k]) for k in COUNT_FIELDS if k not in c} | c  # configs saved before count mode
     if set(c) != set(DEFAULT): raise ValueError('Unknown or missing configuration fields')
+    if c['booking_mode'] not in ('slots','count'): raise ValueError('Booking mode must be slots or count')
+    valid_caps(c['daily_caps'])
+    if not isinstance(c['day_caps'],dict): raise ValueError('Invalid day caps')
+    for d,caps in c['day_caps'].items():
+        if not isinstance(d,str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',d): raise ValueError('Day caps need YYYY-MM-DD dates')
+        date.fromisoformat(d); valid_caps(caps,partial=True)
     ZoneInfo(c['timezone'])
     for k in ('duration_minutes','buffer_minutes'):
         if type(c[k]) is not int or not 0 <= c[k] <= 240: raise ValueError('Invalid duration/buffer')
@@ -66,7 +82,7 @@ def validate_config(c):
     for a,b in c['breaks']:
         if not time.fromisoformat(c['opening']) <= time.fromisoformat(a) < time.fromisoformat(b) <= time.fromisoformat(c['closing']): raise ValueError('Invalid break')
     for k,v in c.items():
-        if k not in ('working_days','breaks','duration_minutes','buffer_minutes'):
+        if k not in ('working_days','breaks','duration_minutes','buffer_minutes')+COUNT_FIELDS:
             if not isinstance(v,str) or len(v)>500: raise ValueError('Invalid configuration text')
     if c['calendar_id']=='primary': raise ValueError('Select an explicit clinic calendar ID')
     if c['spreadsheet_id'] and not re.fullmatch(r'[A-Za-z0-9_-]{10,200}',c['spreadsheet_id']): raise ValueError('Invalid spreadsheet ID')
@@ -74,7 +90,7 @@ def validate_config(c):
 
 def public_event(e):
     # No raw event summary/description/contact data reaches an agent.
-    return {k:copy.deepcopy(e[k]) for k in ('id','start','end','status','kind') if k in e}
+    return {k:copy.deepcopy(e[k]) for k in ('id','start','end','status','kind','mode','category') if k in e}
 
 # What the patient last agreed to, kept on the event so any change made by the
 # clinic (doctor assistant, or editing/deleting directly in Google Calendar) shows
@@ -110,6 +126,28 @@ class NoticeLog:
             except (OSError,ValueError):data={}
             data[patient]=sorted(set(data.get(patient,[]))|set(keys))[-500:];atomic(self.path,data)
 
+class AlertLog:
+    """Doctor alerts (a day's cap reached), kept in a local file. Each record is
+    shown once in the Doctor Assistant; an outside messenger can read the same file."""
+    def __init__(self,path):self.path=Path(path)
+    def _load(self):
+        try:return json.loads(self.path.read_text())
+        except (OSError,ValueError):return []
+    def raise_alert(self,day,category,cap,booked):
+        with lock(self.path.with_suffix('.lock')):
+            alerts=self._load()
+            if any(a['day']==day and a['category']==category and a['cap']==cap for a in alerts):return
+            alerts.append({'id':secrets.token_hex(8),'created':datetime.now().astimezone().isoformat(),'day':day,'category':category,
+                           'cap':cap,'booked':booked,'delivered_in_assistant':False})
+            atomic(self.path,alerts[-500:])
+    def pending(self):return [a for a in self._load() if not a['delivered_in_assistant']]
+    def deliver(self):
+        with lock(self.path.with_suffix('.lock')):
+            alerts=self._load();due=[a for a in alerts if not a['delivered_in_assistant']]
+            for a in due:a['delivered_in_assistant']=True
+            if due:atomic(self.path,alerts)
+            return due
+
 def patient_event(e):
     result=public_event(e);change=clinic_change(e)
     if change:result['clinic_change']=change
@@ -134,6 +172,7 @@ class Service:
         self.synthetic_directory = synthetic_directory
         self.booked_by_clinic = False
         self.notices_seen = None  # NoticeLog in running sessions: each clinic change is told once
+        self.alerts = None  # AlertLog in running sessions: a reached cap is told to the doctor once
     def authorize(self, tool):
         i = self.identity
         if not i.verified or i.clinic != self.config['clinic_id'] or i.source not in ('synthetic','gateway'): raise Denied('Verified identity required')
@@ -185,8 +224,73 @@ class Service:
                 starts.append(a);a+=step
         return sorted(set(starts))
     def on_grid(self, a):return a in self.grid(a.date())
+    def count_mode(self):return self.config['booking_mode']=='count'
+    def caps_for(self,d):return self.config['daily_caps']|self.config['day_caps'].get(d.isoformat(),{})
+    def window(self,d):
+        z=ZoneInfo(self.config['timezone'])
+        return datetime.combine(d,time.fromisoformat(self.config['opening']),z),datetime.combine(d,time.fromisoformat(self.config['closing']),z)
+    def parse_day(self,start):
+        return date.fromisoformat(start) if len(start)==10 else stamp(start).astimezone(ZoneInfo(self.config['timezone'])).date()
+    def day_open(self,d):
+        a,b=self.window(d)
+        if d.weekday() not in self.config['working_days'] or b<=datetime.now(a.tzinfo):return False
+        # A block covering the whole working day closes it; partial blocks do not.
+        return not any(e['kind']=='block' and stamp(e['start'])<=a and stamp(e['end'])>=b for e in self.cal.schedule(a,b))
+    def day_bookings(self,d,category=None,exclude=None):
+        a,b=self.window(d)
+        return [e for e in self.cal.schedule(a,b) if e.get('mode')=='count' and e['kind']=='appointment' and e['status']!='cancelled'
+                and e['id']!=exclude and (category is None or e.get('category')==category)]
+    def places(self,d,exclude=None):
+        caps=self.caps_for(d);out={}
+        for cat in CATEGORIES:
+            booked=len(self.day_bookings(d,cat,exclude));out[cat]={'cap':caps[cat],'booked':booked,'open':max(0,caps[cat]-booked)}
+        return out
+    def open_days(self,category,after,limit=5):
+        days,d=[],after
+        for _ in range(21):
+            d+=timedelta(days=1)
+            if self.day_open(d) and self.places(d)[category]['open']>0:days.append(d.isoformat())
+            if len(days)>=limit:break
+        return days
+    def alert_if_full(self,d,category):
+        p=self.places(d)[category]
+        if self.alerts is not None and p['booked']>=p['cap']:self.alerts.raise_alert(d.isoformat(),category,p['cap'],p['booked'])
+    def book_count(self,start,request_id,confirmation_token=None,category=None,allow_over_cap=False):
+        d=self.parse_day(start)
+        ident=hashlib.sha256(f'{self.identity.clinic}:{self.identity.subject}:{request_id}'.encode()).hexdigest()
+        a,b=self.window(d)
+        existing=self.cal.get(ident)
+        if existing:
+            if existing.get('owner')!=self.identity.subject or existing.get('start')!=a.isoformat(): raise Conflict('Request ID reused for different appointment')
+            return {'calendar_confirmed':True,'appointment':public_event(existing)}
+        if not self.day_open(d):return {'conflict':True,'closed':True,'reason':'The clinic is not taking bookings that day.','alternatives':self.open_days(category or 'consultation',d)}
+        if category is None:
+            history=[e for e in self.cal.owned_events(self.identity.clinic,self.identity.subject) if e['kind']=='appointment' and e['status']!='cancelled']
+            if not history:return {'category_required':True,'question':'Is this a first consultation or a follow-up visit?'}
+            category='follow_up'
+        over=lambda:self.places(d)[category]['open']<=0 and not (self.booked_by_clinic and allow_over_cap)
+        full=lambda:{'conflict':True,'full':True,'day':d.isoformat(),'category':category,'alternatives':self.open_days(category,d)}
+        if over():return full()
+        draft={'id':ident,'start':a.isoformat(),'end':b.isoformat(),'status':'confirmed','kind':'appointment','mode':'count','category':category,
+               'owner':self.identity.subject,'clinic':self.identity.clinic}
+        draft['agreed']=NOT_AGREED if self.booked_by_clinic else agreed_state(draft)
+        needed=self.confirm('book',draft,confirmation_token)
+        if needed:return needed
+        if over():return full()  # recheck immediately before the write
+        try:self.cal.insert(draft)
+        except (TimeoutError,Uncertain):
+            found=self.cal.get(ident)
+            if not found or any(found.get(k)!=v for k,v in draft.items()): raise Uncertain('Write unresolved; retry SAME request ID. Do not confirm booking.')
+        found=self.cal.get(ident)
+        if not found or any(found.get(k)!=v for k,v in draft.items()): raise Uncertain('Calendar verification failed')
+        self.alert_if_full(d,category)
+        return {'calendar_confirmed':True,'appointment':public_event(found),'sheets_status':'pending'}
     def slots(self, day, preferred_start=None):
         d=date.fromisoformat(day); z=ZoneInfo(self.config['timezone']); c=self.config
+        if self.count_mode():
+            result={'mode':'count','day':day,'timezone':c['timezone'],'places':self.places(d)}
+            if not self.day_open(d):result['closed']=True
+            return result
         length=timedelta(minutes=c['duration_minutes'])
         slots=[a.isoformat() for a in self.grid(d) if a>datetime.now(z) and self.available(a,a+length)]
         result={'slots':slots,'timezone':c['timezone']}
@@ -203,8 +307,9 @@ class Service:
             else:status='already_booked'
             result['requested_start_status']=status
         return result
-    def book(self,start,request_id,confirmation_token=None):
+    def book(self,start,request_id,confirmation_token=None,category=None,allow_over_cap=False):
         if not re.fullmatch(r'[A-Za-z0-9_-]{8,100}',request_id): raise ValueError('Request ID must contain 8–100 safe characters')
+        if self.count_mode():return self.book_count(start,request_id,confirmation_token,category,allow_over_cap)
         a,b=self.interval(start)
         ident=hashlib.sha256(f'{self.identity.clinic}:{self.identity.subject}:{request_id}'.encode()).hexdigest()
         existing=self.cal.get(ident)
@@ -232,7 +337,12 @@ class Service:
         if action=='cancel' and e['status']=='cancelled':return {'calendar_confirmed':True,'appointment':public_event(e)}
         if action=='reschedule' and e['status']=='cancelled':raise Denied('Cancelled appointments cannot be rescheduled')
         payload={'appointment_id':ident,'version':e.get('etag',json.dumps(e,sort_keys=True))}
-        if start:
+        day=None
+        if start and e.get('mode')=='count':
+            day=self.parse_day(start);a,b=self.window(day);payload['start']=a.isoformat()
+            if not self.day_open(day):return {'conflict':True,'closed':True,'alternatives':self.open_days(e['category'],day)}
+            if self.places(day,exclude=ident)[e['category']]['open']<=0:return {'conflict':True,'full':True,'day':day.isoformat(),'category':e['category'],'alternatives':self.open_days(e['category'],day)}
+        elif start:
             a,b=self.interval(start);payload['start']=a.isoformat()
             if not doctor and not self.on_grid(a):return {'conflict':True,'requested_start_status':'not_a_clinic_appointment_time','reason':'Not one of the clinic\'s appointment times (the time itself is free or unknown, not booked); offer one of the alternatives.','alternatives':self.slots(a.date().isoformat())}
             if not self.available(a,b,ident):return {'conflict':True,'alternatives':self.slots(a.date().isoformat())}
@@ -248,6 +358,7 @@ class Service:
         found=self.cal.get(ident)
         # Google may return a cancelled event without its times; status alone proves a cancellation.
         if not found or any(found.get(k)!=updated.get(k) for k in (('status',) if action=='cancel' else ('start','end','status'))): raise Uncertain('Change unverified; retry after reviewing Calendar')
+        if day:self.alert_if_full(day,e['category'])
         return {'calendar_confirmed':True,'appointment':public_event(found)}
     def sync(self):
         # Register is reporting state, never read by scheduling operations.
@@ -275,6 +386,14 @@ class Service:
                 changed=[e for e in changed if notice_key(e) not in seen]
                 if changed:self.notices_seen.add(self.identity.subject,[notice_key(e) for e in changed])
             if changed:result={'tell_patient_first':[self.notice(e) for e in changed]}|result
+        if self.identity.role=='doctor' and self.alerts is not None and isinstance(result,dict):
+            told=[]
+            for a in self.alerts.deliver():
+                d=date.fromisoformat(a['day']);p=self.places(d)[a['category']]
+                if p['booked']<p['cap'] or d<datetime.now(ZoneInfo(self.config['timezone'])).date():continue  # reopened or past since
+                label='consultation' if a['category']=='consultation' else 'follow-up'
+                told.append(f"{d.strftime('%a %d %b')}: {p['booked']} of {p['cap']} {label} places are booked, so patients asking for that day are being turned away. Ask the doctor whether to accept more {label}s that day (and how many) or keep it closed.")
+            if told:result={'tell_doctor_first':told}|result
         return result
     def notice(self,e):
         """Plain sentence about a clinic-side change, in clinic time."""
@@ -282,6 +401,11 @@ class Service:
         def when(v):
             t=stamp(v).astimezone(z);return t.strftime('%a %d %b, ')+t.strftime('%I:%M %p').lstrip('0').lower()
         change=clinic_change(e) or e.get('clinic_change')
+        if e.get('mode')=='count':  # a place for the day: name days, never times
+            day=lambda v:stamp(v).astimezone(z).strftime('%a %d %b')
+            if change['type']=='moved_by_clinic':return 'The clinic moved your appointment from '+day(change['previous_start'])+' to '+day(e['start'])+'.'
+            if change['type']=='cancelled_by_clinic':return 'The clinic cancelled your appointment on '+day(e['start'])+'.'
+            return 'The clinic booked a place for you on '+day(e['start'])+'.'
         if change['type']=='moved_by_clinic':
             return 'The clinic changed your appointment from '+when(change['previous_start'])+'–'+when(change.get('previous_end',change['previous_start'])).split(', ')[-1]+' to '+when(e['start'])+'–'+when(e['end']).split(', ')[-1]+'.'
         if change['type']=='cancelled_by_clinic':return 'The clinic cancelled your appointment on '+when(e['start'])+'.'
@@ -301,21 +425,31 @@ class Service:
         if tool=='cancel_my_appointment':return self.change('cancel',args['appointment_id'],token=args.get('confirmation_token'))
         if tool=='reschedule_my_appointment':return self.change('reschedule',args['appointment_id'],args['start'],args.get('confirmation_token'))
         if tool in ('get_clinic_information','doctor_get_clinic_settings'):
-            public=('clinic_name','timezone','working_days','opening','closing','breaks','duration_minutes','buffer_minutes','address','contact','confirmation_policy','cancellation_policy')
+            public=('clinic_name','timezone','working_days','opening','closing','breaks','duration_minutes','buffer_minutes','address','contact','confirmation_policy','cancellation_policy','booking_mode')
+            if tool=='doctor_get_clinic_settings':public+=('daily_caps','day_caps')
             return copy.deepcopy({k:self.config[k] for k in public})|{'clinic_today':datetime.now(ZoneInfo(self.config['timezone'])).date().isoformat()}
         if tool=='doctor_book_appointment':
             from mock import MockCalendar
             if not (isinstance(self.cal,MockCalendar) or self.synthetic_directory):raise Denied('Trusted live patient directory not configured')
             patient=Service(Identity(args['patient_reference'],'patient',self.identity.clinic,'synthetic',True),self.cal,self.sheets,self.config,approver=self.approver)
-            patient.pending=self.pending;patient.booked_by_clinic=True
-            return patient.book(args['start'],args['request_id'],args.get('confirmation_token'))
+            patient.pending=self.pending;patient.booked_by_clinic=True;patient.alerts=self.alerts
+            return patient.book(args['start'],args['request_id'],args.get('confirmation_token'),args.get('category'),args.get('allow_over_cap') is True)
         if tool=='doctor_get_schedule':
             day=date.fromisoformat(args['day']);z=ZoneInfo(self.config['timezone']);a=datetime.combine(day,time(),z)
-            return {'appointments':[doctor_event(e) for e in self.cal.schedule(a,a+timedelta(days=1))]}
+            result={'appointments':[doctor_event(e) for e in self.cal.schedule(a,a+timedelta(days=1))]}
+            if self.count_mode():result['places']=self.places(day)
+            return result
         if tool=='doctor_get_appointment':return doctor_event(self.managed(args['appointment_id']))
         if tool=='doctor_configure_clinic':
             patch=args['changes']
             if set(patch)-set(DEFAULT) or set(patch)&SETUP_ONLY:raise ValueError('Unknown or immutable field')
+            if 'day_caps' in patch:  # one day's change keeps every other day's; null removes a day
+                base=patch.get('daily_caps',self.config['daily_caps']);today=datetime.now(ZoneInfo(self.config['timezone'])).date().isoformat()
+                merged={d:v for d,v in self.config['day_caps'].items() if d>=today}
+                for d,v in patch['day_caps'].items():
+                    if v is None:merged.pop(d,None)
+                    else:valid_caps(v,partial=True);merged[d]=base|merged.get(d,{})|v
+                patch=patch|{'day_caps':merged}
             c=validate_config(self.config|patch)
             needed=self.confirm('configure',c,args.get('confirmation_token'))
             if needed:return needed
@@ -379,15 +513,18 @@ CONFIG_CHANGES=schema({
     'working_days':{'type':'array','items':{'type':'integer','minimum':0,'maximum':6},'minItems':1,'description':'Monday=0 through Sunday=6.'},
     'breaks':{'type':'array','items':{'type':'array','items':{'type':'string'},'minItems':2,'maxItems':2},'description':'Pairs of local HH:MM start/end times.'},
     'duration_minutes':{'type':'integer','minimum':5,'maximum':240,'description':'Appointment length in minutes.'},
-    'buffer_minutes':{'type':'integer','minimum':0,'maximum':240,'description':'Symmetric clearance before AND after each appointment. Five minutes before and after means 5, not 10. Separate before/after settings are unsupported.'}
+    'buffer_minutes':{'type':'integer','minimum':0,'maximum':240,'description':'Symmetric clearance before AND after each appointment. Five minutes before and after means 5, not 10. Separate before/after settings are unsupported.'},
+    'booking_mode':{'type':'string','enum':['slots','count'],'description':'slots: patients pick set start times. count: no times; the doctor caps how many consultations and follow-ups each day takes.'},
+    'daily_caps':{'type':'object','properties':{c:{'type':'integer','minimum':0,'maximum':500} for c in CATEGORIES},'required':list(CATEGORIES),'additionalProperties':False,'description':'Usual places per working day in count mode.'},
+    'day_caps':{'type':'object','additionalProperties':{'type':['object','null'],'properties':{c:{'type':'integer','minimum':0,'maximum':500} for c in CATEGORIES},'additionalProperties':False},'description':'Per-day overrides keyed YYYY-MM-DD, e.g. {"2026-10-20":{"consultation":15}}. Only the days given change; null removes a day.'}
 })
 ARGUMENTS={
  'get_available_slots':schema({'day':'string','preferred_start':'string'},['day']), 'get_my_appointments':schema(),
  'get_clinic_information':schema(),
- 'book_my_appointment':schema({'start':'string','request_id':'string','confirmation_token':'string'},['start','request_id']),
+ 'book_my_appointment':schema({'start':{'type':'string','description':'Slot mode: the exact slot start with offset. Count mode: the day, YYYY-MM-DD.'},'request_id':'string','confirmation_token':'string','category':{'type':'string','enum':list(CATEGORIES),'description':'Count mode only. Omit for a returning patient (follow_up is inferred); ask a new patient.'}},['start','request_id']),
  'cancel_my_appointment':schema({'appointment_id':'string','confirmation_token':'string'},['appointment_id']),
  'reschedule_my_appointment':schema({'appointment_id':'string','start':'string','confirmation_token':'string'},['appointment_id','start']),
- 'doctor_book_appointment':schema({'patient_reference':{'type':'string','enum':['patient-a','patient-b']},'start':'string','request_id':'string','confirmation_token':'string'},['patient_reference','start','request_id']),
+ 'doctor_book_appointment':schema({'patient_reference':{'type':'string','enum':['patient-a','patient-b']},'start':'string','request_id':'string','confirmation_token':'string','category':{'type':'string','enum':list(CATEGORIES)},'allow_over_cap':{'type':'boolean','description':'Count mode: book even though the day is full. Only after the doctor explicitly agrees.'}},['patient_reference','start','request_id']),
  'doctor_get_schedule':schema({'day':'string'},['day']),
  'doctor_get_appointment':schema({'appointment_id':'string'},['appointment_id']),
  'doctor_configure_clinic':schema({'changes':CONFIG_CHANGES,'confirmation_token':'string'},['changes']),

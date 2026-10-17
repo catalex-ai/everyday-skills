@@ -40,6 +40,13 @@ assistants (Patient and Doctor). Never regenerate, edit or re-test the tools.
    `clinic_name`, `address`, `contact` (phone), `timezone` (e.g. `Asia/Kolkata`),
    `working_days` (`[0,1,2,3,4]`, Monday=0), `opening`/`closing` (`09:00`),
    `breaks` (`[["13:00","14:00"]]`), `duration_minutes`, `buffer_minutes` (gap).
+   Also ask how the doctor takes bookings: "Do you want patients to pick set
+   appointment times, or would you rather just see a number of patients each day?"
+   For set times keep the default (`booking_mode=slots`). For a number per day,
+   ask how many first consultations and how many follow-ups a day, then save
+   `booking_mode=count daily_caps='{"consultation":N,"follow_up":M}'`. Explain in
+   one sentence that when a day fills up, the Doctor Assistant will ask whether to
+   take more.
 4. **Ask where bookings should be kept**, showing this comparison:
 
    | | Google Calendar + Sheets | This computer |

@@ -20,11 +20,11 @@
     },
     {
       "actor": "patient_b",
-      "text": "Then find me an additional appointment on {monday} at 3:00 PM, please."
+      "text": "Then find me an additional appointment on {monday} at 3:20 PM, please."
     },
     {
       "actor": "patient_b",
-      "text": "Yes, book the proposed additional appointment at 3:00 PM."
+      "text": "Yes, book the proposed additional appointment at 3:20 PM."
     },
     {
       "actor": "doctor",
@@ -32,15 +32,15 @@
     },
     {
       "actor": "patient_a",
-      "text": "Please move my additional {monday} 2:00 PM appointment to {tuesday} at 10:00 AM."
+      "text": "Please move my additional {monday} 2:00 PM appointment to {tuesday} at 10:20 AM."
     },
     {
       "actor": "patient_a",
-      "text": "Yes, move my additional appointment to {tuesday} at 10:00 AM."
+      "text": "Yes, move my additional appointment to {tuesday} at 10:20 AM."
     },
     {
       "actor": "patient_b",
-      "text": "Please cancel my {monday} 3:00 PM appointment. I cannot make it."
+      "text": "Please cancel my {monday} 3:20 PM appointment. I cannot make it."
     },
     {
       "actor": "patient_b",
@@ -80,7 +80,7 @@
     },
     {
       "actor": "doctor",
-      "text": "Please move Patient A's {tuesday} 10:00 AM appointment to {wednesday} at 11:00 AM."
+      "text": "Please move Patient A's {tuesday} 10:20 AM appointment to {wednesday} at 11:00 AM."
     },
     {
       "actor": "doctor",
@@ -104,23 +104,23 @@
     },
     {
       "actor": "patient_b",
-      "text": "Could you book me on {wednesday} at noon, please?"
+      "text": "Could you book me on {wednesday} at 12:30 PM, please?"
     },
     {
       "actor": "patient_b",
-      "text": "Yes, book Wednesday at noon."
+      "text": "Yes, book Wednesday at 12:30 PM."
     },
     {
       "actor": "patient_b",
-      "text": "Please book that same Wednesday noon appointment again."
+      "text": "Please book that same Wednesday 12:30 PM appointment again."
     },
     {
       "actor": "doctor",
-      "text": "Cancel Patient B's {wednesday} noon appointment, and keep the {tuesday} appointment."
+      "text": "Cancel Patient B's {wednesday} 12:30 PM appointment, and keep the {tuesday} appointment."
     },
     {
       "actor": "doctor",
-      "text": "Yes, cancel only Patient B's {wednesday} noon appointment."
+      "text": "Yes, cancel only Patient B's {wednesday} 12:30 PM appointment."
     },
     {
       "actor": "doctor",

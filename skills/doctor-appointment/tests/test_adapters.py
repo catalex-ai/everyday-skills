@@ -71,6 +71,19 @@ class GoogleBoundaryTests(unittest.TestCase):
         self.assertEqual(c.api.body['status'],'cancelled')
         self.assertEqual(c.api.body['extendedProperties']['private']['clinicStatus'],'cancelled')
         self.assertEqual(Calendar.encode(dict(e,status='confirmed'))['status'],'confirmed')
+    def test_count_booking_round_trips_and_stays_free_in_google(self):
+        # Free/busy must ignore a day place, or one count booking blocks the whole day.
+        e=dict(next(iter(fixture()['events'].values())),mode='count',category='follow_up')
+        raw=Calendar.encode(e)
+        self.assertEqual(raw['transparency'],'transparent')
+        back=Calendar.decode(raw)
+        self.assertEqual((back['mode'],back['category']),('count','follow_up'))
+        self.assertEqual(Calendar.encode(dict(e,mode=None,category=None))['transparency'],'opaque')
+    def test_google_conflict_review_ignores_count_bookings(self):
+        e=next(iter(fixture()['events'].values()))
+        same_day=[dict(e,id='one',mode='count'),dict(e,id='two',mode='count')]
+        c=object.__new__(Calendar);c.schedule=lambda a,b:same_day
+        self.assertEqual(c.review_conflicts(),[])
     def test_cancel_and_sync_accept_cancelled_event_without_times(self):
         from core import Service,Identity,DEFAULT
         state=fixture();cal=MockCalendar(state['events']);sheets=MockSheets()

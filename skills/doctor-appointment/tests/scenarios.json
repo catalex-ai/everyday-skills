@@ -1,14 +1,14 @@
 {
-  "version": 1,
+  "version": 2,
   "timezone": "Asia/Kolkata",
   "messages": [
     {
       "actor": "patient_a",
-      "text": "Please book me an additional appointment on {monday} at 2:00 PM, and keep my existing 9:00 AM appointment."
+      "text": "Please book me an additional appointment on {tuesday} at 2:00 PM, and keep my existing {monday} 9:00 AM appointment."
     },
     {
       "actor": "patient_b",
-      "text": "Please book me an additional appointment on {monday} at 2:00 PM, and keep my existing 10:00 AM appointment."
+      "text": "Please book me an additional appointment on {tuesday} at 2:00 PM, and keep my existing {monday} 10:00 AM appointment."
     },
     {
       "actor": "patient_a",
@@ -20,7 +20,7 @@
     },
     {
       "actor": "patient_b",
-      "text": "Then find me an additional appointment on {monday} at 3:20 PM, please."
+      "text": "Then find me an additional appointment on {tuesday} at 3:20 PM, please."
     },
     {
       "actor": "patient_b",
@@ -28,11 +28,11 @@
     },
     {
       "actor": "doctor",
-      "text": "Show me the appointments for {monday}."
+      "text": "Show me the appointments for {tuesday}."
     },
     {
       "actor": "patient_a",
-      "text": "Please move my additional {monday} 2:00 PM appointment to {tuesday} at 10:20 AM."
+      "text": "Please move my additional {tuesday} 2:00 PM appointment to 10:20 AM the same day."
     },
     {
       "actor": "patient_a",
@@ -40,7 +40,7 @@
     },
     {
       "actor": "patient_b",
-      "text": "Please cancel my {monday} 3:20 PM appointment. I cannot make it."
+      "text": "Please cancel my {tuesday} 3:20 PM appointment. I cannot make it."
     },
     {
       "actor": "patient_b",
@@ -68,7 +68,11 @@
     },
     {
       "actor": "patient_a",
-      "text": "Could you book another appointment on {wednesday} at 10:20 AM?"
+      "text": "Could you book me another appointment on {wednesday} at 2:00 PM as well?"
+    },
+    {
+      "actor": "patient_b",
+      "text": "Could you book me an appointment on {wednesday} at 10:20 AM?"
     },
     {
       "actor": "doctor",
@@ -156,7 +160,7 @@
     },
     {
       "actor": "patient_a",
-      "text": "Book me for {wednesday} at 4:30 PM Singapore time."
+      "text": "Book me for {thursday} at 4:30 PM Singapore time."
     },
     {
       "actor": "patient_a",

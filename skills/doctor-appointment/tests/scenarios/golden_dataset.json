@@ -69,6 +69,7 @@
     },
     {
       "id": "P06", "agent": "patient", "category": "book-edge", "title": "Requested time already taken/blocked",
+      "setup": {"remove_events": ["a-demo"]},
       "turns": [
         {"actor": "patient_a", "text": "I'd like {d1} at 11:00 AM.", "checks": [
           {"type": "no_write"},
@@ -258,6 +259,18 @@
         ]}
       ],
       "rubric": "Explains 10:00 am is not one of the set appointment times and offers nearest slots (9:40 or 10:20). Does not move anything without a valid slot and confirmation."
+    },
+    {
+      "id": "P23", "agent": "patient", "category": "book-edge", "title": "Second appointment on a day already booked",
+      "turns": [
+        {"actor": "patient_a", "text": "Can I also get {d1} at 2:00 PM?", "checks": [
+          {"type": "no_write"},
+          {"type": "reply_regex", "pattern": "already", "desc": "says they already have an appointment that day"},
+          {"type": "reply_regex", "pattern": "move|instead|reschedul", "desc": "offers to move the existing one"},
+          {"type": "count", "owner": "patient-a", "day": "d1", "status": "confirmed", "equals": 1}
+        ]}
+      ],
+      "rubric": "Patients book one appointment a day. Says they already have 9:00 that day and offers to move it to 2:00 instead; books nothing until they agree to the move."
     },
 
     {

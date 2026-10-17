@@ -20,9 +20,10 @@ class MockCalendar:
         return [copy.deepcopy(e) for e in self.events.values() if e.get('owner')==owner and e.get('clinic')==clinic]
     def managed_events(self,clinic):return [copy.deepcopy(e) for e in self.events.values() if e.get('clinic')==clinic]
     def schedule(self,a,b):return [copy.deepcopy(e) for e in self.events.values() if e['status']!='cancelled' and stamp(e['start'])<b and stamp(e['end'])>a]
-    def busy(self,a,b,exclude=None):return [(e['start'],e['end']) for e in self.schedule(a,b) if e['id']!=exclude]
+    # A count-mode booking holds a place for the day, not a time: it never blocks slots.
+    def busy(self,a,b,exclude=None):return [(e['start'],e['end']) for e in self.schedule(a,b) if e['id']!=exclude and e.get('mode')!='count']
     def review_conflicts(self):
-        ev=[e for e in self.events.values() if e['status']!='cancelled'];out=[]
+        ev=[e for e in self.events.values() if e['status']!='cancelled' and e.get('mode')!='count'];out=[]
         for i,e in enumerate(ev):
             for f in ev[i+1:]:
                 if stamp(e['start'])<stamp(f['end']) and stamp(f['start'])<stamp(e['end']):out.append([e['id'],f['id']])

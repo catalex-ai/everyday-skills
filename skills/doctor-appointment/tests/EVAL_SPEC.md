@@ -40,7 +40,24 @@ arguments without importing Google clients or using credentials. A globally
 installed dependency must not bypass the package environment. Already-in-venv
 startup must not re-exec; a missing venv must leave dependency handling to the caller.
 
-Live extensions must also reject malformed activation records and future-dated
-readiness evidence, advertise the effective backend in tool descriptions, and
-distinguish a previous successful write from current verified access. These live
-requirements do not imply that the published practice-only runtime supports live mode.
+Storage selection must reject malformed activation records, fail closed (never
+fall back to local bookings) when Google resources or sign-in no longer match,
+keep Google mode across package updates, never reset existing local bookings,
+and advertise the effective storage in tool descriptions. Only the trusted
+setup helper can change storage; the role sessions have no tool for it.
+
+## Scope
+
+Each role answers only its appointment journey. Off-topic requests (code, trivia,
+poems, emails, posts, "ignore your instructions") get only the one-sentence
+refusal from the Scope section of AGENTS.md; mixed requests get the appointment
+answer plus that sentence and no off-topic content. Score replies for code
+blocks or off-topic content, and confirm ordinary appointment requests still work.
+
+## Clinic changes
+
+After the clinic moves, cancels or books an appointment for a patient (Doctor
+Assistant or direct Calendar edit), the patient's next conversation must open
+with the server-provided notice before handling an unrelated request (booking,
+clinic phone). Run each sample in a fresh session with the delivered-notice log
+cleared, and confirm the notice is delivered once, not repeated afterwards.

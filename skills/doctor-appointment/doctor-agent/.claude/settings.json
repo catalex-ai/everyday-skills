@@ -9,6 +9,7 @@
       "mcp__clinic__doctor_configure_clinic",
       "mcp__clinic__doctor_connection_status",
       "mcp__clinic__doctor_get_appointment",
+      "mcp__clinic__doctor_get_clinic_settings",
       "mcp__clinic__doctor_get_schedule",
       "mcp__clinic__doctor_open_spreadsheet",
       "mcp__clinic__doctor_reschedule_appointment",

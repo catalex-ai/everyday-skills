@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "notes": [
+    "Count mode: the doctor caps first consultations and follow-ups per day instead of offering time slots.",
+    "Default fixture: Patient A and B each have an existing appointment on d1 (so both count as returning/follow-up patients unless b-demo is removed).",
+    "A count booking is stored as a place spanning the clinic day (09:00-17:00) with mode=count and a category."
+  ],
+  "cases": [
+    {"id": "CM01", "agent": "doctor", "category": "count-setup", "title": "Doctor switches to daily patient caps",
+     "turns": [
+      {"actor": "doctor", "text": "From now on I don't want time slots. I'll just see 10 new consultations and 5 follow-ups a day.", "checks": [
+        {"type": "no_write"}, {"type": "called", "tool": "doctor_configure_clinic"}]},
+      {"actor": "doctor", "text": "Yes, apply that.", "checks": [
+        {"type": "config", "values": {"booking_mode": "count", "daily_caps": {"consultation": 10, "follow_up": 5}}}]}
+     ],
+     "rubric": "Proposes count mode with 10 consultations and 5 follow-ups per day, asks once, applies after yes and reports it in plain words (no field names)."},
+
+    {"id": "CM02", "agent": "doctor", "category": "count-setup", "title": "Switch to count mode without numbers asks for them",
+     "turns": [
+      {"actor": "doctor", "text": "Switch to taking a number of patients per day instead of time slots.", "checks": [
+        {"type": "no_write"}, {"type": "reply_regex", "pattern": "how many|number of", "desc": "asks how many"},
+        {"type": "reply_regex", "pattern": "follow", "desc": "asks about follow-ups separately"}]}
+     ],
+     "rubric": "Asks how many first consultations and how many follow-ups per day before proposing anything. Does not invent numbers."},
+
+    {"id": "CM03", "agent": "patient", "category": "count-booking", "title": "Returning patient books a place for a day (no times)",
+     "setup": {"config": {"booking_mode": "count", "daily_caps": {"consultation": 2, "follow_up": 2}}},
+     "turns": [
+      {"actor": "patient_a", "text": "Can I come in on {d2}?", "checks": [
+        {"type": "no_write"},
+        {"type": "reply_not_regex", "pattern": "\\b\\d{1,2}:\\d{2}\\b", "desc": "offers a day, not a clock time"}]},
+      {"actor": "patient_a", "text": "Yes please, book it.", "checks": [
+        {"type": "count_booking", "owner": "patient-a", "day": "d2", "category": "follow_up"}]}
+     ],
+     "rubric": "Offers a place on that day without promising any time, treats the returning patient as a follow-up without asking, books after yes, confirms the day only."},
+
+    {"id": "CM04", "agent": "patient", "category": "count-booking", "title": "First-time patient is asked first visit or follow-up",
+     "setup": {"config": {"booking_mode": "count", "daily_caps": {"consultation": 2, "follow_up": 2}}, "remove_events": ["b-demo"]},
+     "turns": [
+      {"actor": "patient_b", "text": "I'd like to book an appointment on {d2}.", "checks": [
+        {"type": "no_write"}, {"type": "reply_regex", "pattern": "first|follow", "desc": "asks first visit or follow-up"}]},
+      {"actor": "patient_b", "text": "It's my first visit.", "checks": [{"type": "no_write"}]},
+      {"actor": "patient_b", "text": "Yes.", "checks": [
+        {"type": "count_booking", "owner": "patient-b", "day": "d2", "category": "consultation"}]}
+     ],
+     "rubric": "Asks plainly whether this is a first visit or a follow-up (no other personal/medical questions), proposes a first-consultation place on that day, books after yes."},
+
+    {"id": "CM05", "agent": "multi", "category": "count-cap", "title": "Cap reached alerts doctor; doctor accepts more",
+     "setup": {"config": {"booking_mode": "count", "daily_caps": {"consultation": 1, "follow_up": 2}}, "remove_events": ["b-demo"]},
+     "turns": [
+      {"actor": "patient_b", "text": "Please book me a first consultation on {d2}.", "checks": [{"type": "no_write"}]},
+      {"actor": "patient_b", "text": "Yes, book it.", "checks": [
+        {"type": "count_booking", "owner": "patient-b", "day": "d2", "category": "consultation"},
+        {"type": "reply_not_regex", "pattern": "doctor (has been|was|will be) (told|alerted|notified)|cap|limit", "desc": "patient not told about caps or alerts"}]},
+      {"actor": "doctor", "text": "Good morning. Anything I need to know?", "checks": [
+        {"type": "doctor_alert_first"}, {"type": "no_write"}]},
+      {"actor": "doctor", "text": "Yes, take 3 more consultations that day.", "checks": [
+        {"type": "no_write"}, {"type": "called", "tool": "doctor_configure_clinic"}]},
+      {"actor": "doctor", "text": "Yes, go ahead.", "checks": [
+        {"type": "day_cap", "day": "d2", "category": "consultation", "equals": 4},
+        {"type": "config", "values": {"daily_caps": {"consultation": 1, "follow_up": 2}}}]}
+     ],
+     "rubric": "When the only consultation place fills, the doctor's next reply opens with the cap alert and asks whether to accept more. 'Take 3 more' becomes that day's total of 4 (1+3), proposed then applied for that day only; the usual daily caps stay unchanged."},
+
+    {"id": "CM06", "agent": "patient", "category": "count-cap", "title": "Full day: patient told and offered other days",
+     "setup": {"config": {"booking_mode": "count", "daily_caps": {"consultation": 2, "follow_up": 1}},
+               "add_events": [{"id": "count-b", "owner": "patient-b", "day": "d2", "time": "09:00", "minutes": 480, "mode": "count", "category": "follow_up"}]},
+     "turns": [
+      {"actor": "patient_a", "text": "Book me on {d2}, please.", "checks": [
+        {"type": "no_write"},
+        {"type": "reply_regex", "pattern": "full|no (places|spots|space)|fully booked|isn't available|not available", "desc": "says the day is full"},
+        {"type": "reply_not_regex", "pattern": "\\bcap\\b|limit|another patient|patient b", "desc": "does not reveal caps or other patients"}]},
+      {"actor": "patient_a", "text": "OK, the next day you have then.", "checks": [{"type": "no_write"}]},
+      {"actor": "patient_a", "text": "Yes.", "checks": [
+        {"type": "count_booking", "owner": "patient-a", "day": "d3", "category": "follow_up"}]}
+     ],
+     "rubric": "Explains the day has no follow-up places left (no mention of caps, numbers or other patients), offers the next days with room, books the chosen day after yes."},
+
+    {"id": "CM07", "agent": "multi", "category": "count-cap", "title": "Doctor keeps a full day closed",
+     "setup": {"config": {"booking_mode": "count", "daily_caps": {"consultation": 1, "follow_up": 1}}, "remove_events": ["b-demo"]},
+     "turns": [
+      {"actor": "patient_b", "text": "Book me a first consultation on {d2}.", "checks": [{"type": "no_write"}]},
+      {"actor": "patient_b", "text": "Yes.", "checks": [{"type": "count_booking", "owner": "patient-b", "day": "d2", "category": "consultation"}]},
+      {"actor": "doctor", "text": "Show me {d2}.", "checks": [{"type": "doctor_alert_first"}]},
+      {"actor": "doctor", "text": "No, keep it closed.", "checks": [
+        {"type": "no_write"}, {"type": "day_cap", "day": "d2", "category": "consultation", "equals": 1}]},
+      {"actor": "doctor", "text": "Show me {d2} again.", "checks": [
+        {"type": "reply_not_regex", "pattern": "accept more|take more", "desc": "does not re-ask about the same alert"}]}
+     ],
+     "rubric": "Alert shown once with the question; 'keep it closed' is acknowledged with no change; the alert is not repeated afterwards. The schedule shows consultations 1 of 1 (full)."},
+
+    {"id": "CM08", "agent": "doctor", "category": "count-cap", "title": "Doctor books over a full day only after explicit yes",
+     "setup": {"config": {"booking_mode": "count", "daily_caps": {"consultation": 1, "follow_up": 1}},
+               "add_events": [{"id": "count-a", "owner": "patient-a", "day": "d2", "time": "09:00", "minutes": 480, "mode": "count", "category": "consultation"}]},
+     "turns": [
+      {"actor": "doctor", "text": "Book Patient B for a consultation on {d2}.", "checks": [
+        {"type": "no_write"}, {"type": "reply_regex", "pattern": "full|1 of 1|no (places|space)", "desc": "warns the day is full"}]},
+      {"actor": "doctor", "text": "Yes, book them anyway.", "checks": [{"type": "no_write"}]},
+      {"actor": "doctor", "text": "Yes.", "checks": [
+        {"type": "count_booking", "day": "d2", "category": "consultation", "equals": 2}]}
+     ],
+     "rubric": "Warns the day is full for consultations and asks before overbooking; after the doctor agrees, proposes the over-cap booking and books it after yes. (A single combined confirmation is also fine if the over-cap proposal was shown.)"},
+
+    {"id": "CM09", "agent": "doctor", "category": "count-setup", "title": "Doctor sets a different cap for one day",
+     "setup": {"config": {"booking_mode": "count", "daily_caps": {"consultation": 10, "follow_up": 5}}},
+     "turns": [
+      {"actor": "doctor", "text": "On {d3} I'll take 15 consultations.", "checks": [{"type": "no_write"}]},
+      {"actor": "doctor", "text": "Yes.", "checks": [
+        {"type": "day_cap", "day": "d3", "category": "consultation", "equals": 15},
+        {"type": "day_cap", "day": "d3", "category": "follow_up", "equals": 5},
+        {"type": "config", "values": {"daily_caps": {"consultation": 10, "follow_up": 5}}}]}
+     ],
+     "rubric": "Changes only that day's consultation cap to 15 (follow-ups stay 5), proposes then applies; usual daily caps unchanged."},
+
+    {"id": "CM10", "agent": "doctor", "category": "count-view", "title": "Doctor asks how full a day is",
+     "setup": {"config": {"booking_mode": "count", "daily_caps": {"consultation": 2, "follow_up": 1}},
+               "add_events": [{"id": "count-a", "owner": "patient-a", "day": "d2", "time": "09:00", "minutes": 480, "mode": "count", "category": "follow_up"},
+                              {"id": "count-b", "owner": "patient-b", "day": "d2", "time": "09:00", "minutes": 480, "mode": "count", "category": "consultation"}]},
+     "turns": [
+      {"actor": "doctor", "text": "How full is {d2}?", "checks": [
+        {"type": "called", "tool": "doctor_get_schedule"},
+        {"type": "reply_regex", "pattern": "1 of 2", "desc": "consultations 1 of 2"},
+        {"type": "reply_regex", "pattern": "1 of 1|full", "desc": "follow-ups full"}]}
+     ],
+     "rubric": "Reports consultations 1 of 2 booked and follow-ups 1 of 1 (full), with patient labels; no clock times for the places."},
+
+    {"id": "CM11", "agent": "patient", "category": "count-booking", "title": "Patient moves a day place to another day",
+     "setup": {"config": {"booking_mode": "count", "daily_caps": {"consultation": 2, "follow_up": 2}},
+               "add_events": [{"id": "count-a", "owner": "patient-a", "day": "d2", "time": "09:00", "minutes": 480, "mode": "count", "category": "follow_up"}]},
+     "turns": [
+      {"actor": "patient_a", "text": "Please move my {d2} appointment to {d3}.", "checks": [
+        {"type": "no_write"}, {"type": "called", "tool": "reschedule_my_appointment"}]},
+      {"actor": "patient_a", "text": "Yes, move it.", "checks": [
+        {"type": "event_id", "id": "count-a", "day": "d3", "status": "confirmed"}]}
+     ],
+     "rubric": "Moves the same booking to the new day after confirmation, describing days only (no times)."},
+
+    {"id": "CM12", "agent": "multi", "category": "count-cap", "title": "Two patients race for the last place",
+     "setup": {"config": {"booking_mode": "count", "daily_caps": {"consultation": 2, "follow_up": 1}}},
+     "turns": [
+      {"parallel": [
+        {"actor": "patient_a", "text": "Book me on {d2}.", "checks": []},
+        {"actor": "patient_b", "text": "Book me on {d2}.", "checks": []}],
+       "checks": [{"type": "no_write"}]},
+      {"parallel": [
+        {"actor": "patient_a", "text": "Yes, book it.", "checks": []},
+        {"actor": "patient_b", "text": "Yes, book it.", "checks": []}],
+       "checks": [{"type": "count_booking", "day": "d2", "category": "follow_up", "equals": 1}]}
+     ],
+     "rubric": "Both returning patients want the only follow-up place; exactly one gets it and the other is told honestly that the day is now full and offered other days. No false confirmation."}
+  ]
+}

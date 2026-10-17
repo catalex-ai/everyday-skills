@@ -1,45 +1,87 @@
-# Doctor Assistant: two native agent terminals
+# Doctor Assistant
 
-**Prebuilt package for Codex and Claude Code. Synthetic scheduling works; live
-patient mode remains disabled.** No Python launcher, application or installer.
-The patient and doctor folders contain native instructions, skills, permissions
-and separate narrow MCP surfaces backed by one shared Python scheduler.
+Two ready-made appointment assistants for a clinic, for **Claude Code** or **Codex**:
+a **Patient Assistant** (book, move or cancel your own appointment) and a
+**Doctor Assistant** (see the day, book for a patient, block time, change hours).
+Bookings are kept either in the clinic's **Google Calendar + Sheets** or on
+**this computer**; you choose during setup.
 
-Give your creation assistant this prompt:
+Give your coding assistant this prompt:
 
 > Read https://raw.githubusercontent.com/catalex-ai/everyday-skills/main/skills/doctor-appointment/SKILL.md
-> and create the two native Doctor Assistant sessions here using the prebuilt tools.
-> Guide me through the short setup Q&A. Check live readiness before asking for Google
-> authorization; do not silently leave an authorized clinic using mock appointments.
+> and set up the Doctor Assistant here.
 
-The assistant downloads the **whole folder**, verifies published hashes, runs a
-quick offline compatibility check, prepares native login/config and audits your
-chosen runtime. It does not regenerate tools or repeat publisher tests. The original
-creation session may have developer permissions; the patient session does not.
+It installs the prebuilt tools, asks a few plain questions (clinic name, hours,
+set appointment times or a number of patients per day, where to keep bookings,
+and for Google which calendar and spreadsheet) and tells you how to open both
+assistants. You do not run any commands.
 
-## Prepare once
+Real-patient sign-in is not available yet: the Patient Assistant works with two
+test patients, Patient A and Patient B.
 
-After copying the bundle to `doctor-assistant/`, from your workspace root:
+## What the assistants do
 
-```sh
-python3 doctor-assistant/scripts/verify_package.py
-python3 doctor-assistant/tools/smoke.py
-python3 doctor-assistant/tools/admin.py native-prepare
-```
+Both talk like a person at the front desk: short plain messages, a simple
+"Shall I book it?" before any change, and nothing happens until you say yes.
 
-`native-prepare` is a trusted configuration/auth operation, not a session launcher.
-It links your existing protected native Codex auth file into the two isolated
-`.codex` homes without reading/copying its contents. If no existing login exists,
-run `CODEX_HOME="$PWD/.codex" codex login` in each role folder. Native Claude uses
-its existing login. No Google credentials are needed for practice.
+**Patient Assistant** (one patient's own appointments only):
+- Shows free times and the patient's appointments; books, moves and cancels.
+- Explains why a time can't be booked (closed, taken, or not one of the clinic's
+  set times) and offers the nearest ones.
+- Opens with any change the clinic made since the patient last visited ("The
+  clinic changed your appointment from Mon 19 Oct, 9:00 am to Tue 20 Oct, 11:00 am.").
+- Answers questions about the clinic's hours, address, phone and policies.
+- Refuses anything else, including other people's appointments, and never gives
+  medical advice (possible emergencies are told to call 112 first).
+
+**Doctor Assistant** (the whole clinic's book):
+- Shows any day's schedule with patient labels and blocked time.
+- Books for Patient A or B; moves or cancels any appointment; blocks and
+  unblocks time, showing any appointments a block overlaps.
+- Changes hours, working days, breaks, appointment length, buffer and booking
+  mode, and checks for appointments the change would affect.
+- In number-per-day mode, reports how full each day is and asks whether to take
+  more patients when a day fills up.
+- Syncs and reviews the appointment spreadsheet.
+
+Try: Patient: "What's free on Tuesday?", "Book me Tuesday at 10:20", "Move my
+appointment to Friday", "Cancel my appointment". Doctor: "Show tomorrow's
+schedule", "Book Patient B Tuesday at 3", "Block Thursday 2 to 4", "Set
+appointments to 20 minutes", "From now on, 10 consultations and 5 follow-ups a
+day", "On Friday I'll take 15", "Sync the register".
+
+### Set times or a number of patients per day
+
+A clinic runs in one of two booking modes, chosen in setup and changeable later
+by telling the Doctor Assistant:
+
+- **Set times** (default): patients pick from the clinic's appointment times.
+- **Number per day**: no times. The doctor sets how many first consultations and
+  follow-ups a day takes ("10 consultations and 5 follow-ups a day"), and can
+  change one day ("on Thursday I'll take 15"). Patients book a place on a day;
+  returning patients count as follow-ups automatically and new patients are asked.
+  When a day fills up, the booking that took the last place records an alert in
+  `config/doctor-alerts.json` (for a messaging connector to pick up) and the
+  Doctor Assistant's next reply asks the doctor whether to take more that day.
+  Patients asking for a full day are offered the next days with room.
+
+### Patients hear about clinic changes
+
+Each appointment remembers the time the patient last agreed to. When the clinic
+moves, cancels or books an appointment for a patient (through the Doctor
+Assistant, or by editing or deleting the event directly in Google Calendar), the
+patient's next request to the Patient Assistant first returns only a plain
+notice, e.g. "The clinic moved your appointment from Tue 13 Oct, 4:05 pm to
+Wed 14 Oct, 10:00 am.", which the assistant tells them before anything else.
+Each change is delivered once (`config/notices-seen.json`). There is no
+email/SMS: patients learn about it the next time they use the assistant.
+Bookings made before this version only report direct deletions until the
+doctor first changes them through the assistant.
 
 ## Open an assistant
 
-After the one-time preparation, double-click **Patient Assistant.command** or
-**Doctor Assistant.command** in Finder. These open native Codex on **GPT-6-Luna** with the tested
-restrictions. The shortcuts use your login shell's PATH to locate the CLI.
-
-From a terminal, the same minimal entry point supports either runtime:
+Codex: double-click **Patient Assistant.command** or **Doctor Assistant.command**.
+From a terminal (either runtime):
 
 ```sh
 ./doctor-assistant/start.sh patient
@@ -48,10 +90,74 @@ From a terminal, the same minimal entry point supports either runtime:
 ./doctor-assistant/start.sh doctor claude
 ```
 
-The shortcuts only select the folder and pass the existing restricted native CLI
-options. They do not install dependencies, authenticate Google, or change policy.
-If macOS blocks a downloaded shortcut, review it and use Finder's Open action;
-terminal invocation remains available. Missing CLIs fail without a fallback.
+The shortcuts only pass the restricted native CLI options below. They do not
+install dependencies, sign in to Google or change policy.
+
+## Where bookings are kept
+
+| | Google Calendar + Sheets | This computer |
+|---|---|---|
+| Good | Phone/Calendar view, spreadsheet register, survives a lost laptop | No sign-in, works offline, private |
+| Less good | One-time Google sign-in; each change shows an Approve pop-up | Only on this computer; no spreadsheet |
+
+Only the setup helper (`tools/admin.py`, run by a setup assistant) can choose or
+switch. The Patient and Doctor assistants have no tool for it and cannot change
+the calendar or spreadsheet. Switching does not copy existing bookings.
+
+```sh
+doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py status
+doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py clinic-settings --set clinic_name="Example Clinic" --set opening=09:00
+doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py use-laptop
+doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py list-calendars
+doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py google-setup --calendar "Clinic" --new-register "Clinic appointments" [--client PATH]
+doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py activate
+```
+
+`google-setup` reuses a working sign-in stored in macOS Keychain; `--client` is
+needed only for the first sign-in. `--register-url LINK` uses an existing
+spreadsheet instead of creating one. `activate` reads the chosen calendar and
+spreadsheet once and switches both assistants to Google. Google mode is bound to
+those two resources: if they change or the sign-in stops working, every request
+fails with a clear message and nothing falls back to this computer. Package
+updates do not turn Google mode off. `google-revoke` signs out and turns it off.
+
+Each Google write (book, move, cancel, block, settings) needs a click on the
+macOS "Doctor Assistant approval" pop-up, which the assistants cannot press.
+
+### Google sign-in file
+
+Needed once per clinic Google account (a publisher-provided client is not shipped):
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create or pick a
+   project and enable **Google Calendar API** and **Google Sheets API**.
+2. **Google Auth Platform**: set Branding (app name, support email), Audience
+   (Internal if offered, otherwise External and add your account as a test
+   user), and Data Access for the three scopes below.
+3. **Clients** → create client → type **Desktop app** → download the JSON to a
+   private folder outside `doctor-assistant/`. Never paste its contents in chat.
+
+Scopes: `calendar.events`, `calendar.readonly`, `spreadsheets`. No Drive or Gmail.
+Sign-in uses a browser loopback flow and stores the token only in macOS Keychain
+(no plaintext fallback). Testing-mode tokens may expire; run `google-setup
+--client PATH` again. If the machine is lost, also remove the app from your
+Google Account's third-party connections.
+
+The register has `Appointments` (ID, start/end, status, kind, last seen, issue)
+and `Daily Summary` sheets. Calendar is the source of truth; a spreadsheet
+failure never undoes a booking. Cancelling removes the event from the calendar
+view; the spreadsheet keeps the history. Installs from before 0.4.0 left
+cancelled events visible (marked Free), which look booked; remove them once with
+`admin.py hide-cancelled`.
+
+# For maintainers
+
+Setup above does not run any of this. Consumers reuse the published results.
+
+## Native permissions
+
+`native-prepare` links an existing Codex login into the two isolated `.codex`
+homes without reading it. Without a login, run `CODEX_HOME="$PWD/.codex" codex
+login` in each role folder. Claude uses its existing login.
 
 ## Codex: two native terminals
 
@@ -113,7 +219,7 @@ Bash sandbox cannot retry outside its boundary. Native skills are used directly.
 Tested on Claude Code 2.1.296. Plain `claude` or `codex` in a folder does not prove
 permissions isolation; use the exact native command for the chosen runtime.
 
-## Practice and verification
+## Practice data and evaluations
 
 ```sh
 python3 doctor-assistant/tools/admin.py practice-demo
@@ -128,17 +234,24 @@ blocked range. First mock Sheets synchronization deliberately fails; retry succe
 check without changing shared practice state. `doctor_book_appointment` books for
 configured Patient A/B through the same scheduler, with action-bound confirmation.
 
-Patient phrases: “Show my appointments”, “Book tomorrow at 14:00”, “Cancel my
-appointment”, “What is the clinic address?” Doctor phrases: “Show tomorrow's
-schedule”, “Book Patient B tomorrow at 16:00”, “Set duration to 20 minutes”,
-“Block tomorrow 11:00–12:00”, “Sync the register”. Explicitly confirm displayed
-proposals. Never enter real patient data in practice.
+Use the phrases under "What the assistants do" and confirm each proposal
+explicitly. Never enter real patient data in practice.
 
 Configuration is conversational through doctor_configure_clinic: name, timezone,
 working days (Monday=0), hours, breaks, duration, buffers, address/contact, resource
 IDs and policies. Trusted code validates and persists it. Practice JSON is separate
 from Google configuration; it is only the mock adapter's local sample database.
 The live design uses Calendar as appointment truth, not that file or Sheets.
+
+With no storage chosen, the sessions use this synthetic practice fixture. It is
+for tests and evaluations only; setup always chooses Google or this computer.
+
+Optional live end-to-end check (books and cancels one synthetic event, each
+approved in the pop-up; not part of setup):
+
+```sh
+doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py synthetic-google-test
+```
 
 An opt-in maintainer test actually starts native Codex sessions in both folders,
 books one synthetic appointment through each role, views the doctor's schedule,
@@ -166,104 +279,29 @@ Google access. They save redacted transcripts and objective fixture checks. See
 [fresh public-clone check](references/transcripts/fresh-clone.md) verifies native
 booking and doctor visibility on both models. Passing a finite scenario does
 not establish perfect conversation quality or authorize real-patient use.
-Full offline regressions are included for maintainers and CI. Consumers need only
-integrity, smoke and their local runtime audit. See TESTING.md.
+Full offline regressions are included for maintainers and CI. See TESTING.md.
 
-## Connect Google during creation
+### Golden eval suite (Claude Haiku)
 
-The creation skill uses a [short Q&A](references/setup-wizard.md) and checks the actual
-backend before requesting consent. This release cannot activate Google scheduling:
-authorization only connects and verifies resources. Practice requires an explicit
-choice. Once live support is implemented and verified, successful setup must select
-Google automatically without an additional activation step. Prepare optional Google dependencies
-from your workspace root (the creation assistant can do this):
+A broader scenario suite runs real Haiku Patient and Doctor sessions, several at
+once when a case needs it, each in an isolated synthetic copy of the package
+(never Google). Every turn checks the stored bookings, the tools used, the reply
+(no false confirmations, leaks or bot-style formatting) and the model, and a
+Haiku judge grades each conversation against its expected behaviour:
 
 ```sh
-python3 -m venv doctor-assistant/.venv
-doctor-assistant/.venv/bin/python -m pip install -r doctor-assistant/requirements.lock.txt
+python3 doctor-assistant/evals/golden_eval.py                       # all suites
+python3 doctor-assistant/evals/golden_eval.py --cases B09,X05 --label retry-1
 ```
 
+Scenarios live in `tests/scenarios/` (golden set, the end-to-end simulation spec,
+and number-per-day mode); transcripts are written to `tests/conversations/`. A
+live dashboard is written to `evals/dashboard.html` while it runs. Scenarios the
+architecture cannot run (messaging, patient acceptance of doctor proposals,
+fault injection, staff permission tiers) are marked BLOCKED, never passed. See
+[evals/README.md](evals/README.md) and the latest [report](evals/REPORT.md).
 
-OAuth setup and access checks can run without enabling live appointments. These
-commands are **not MCP tools**; the human must run them outside the patient/doctor sessions.
-Do not paste credential contents or tokens into chat.
 
-1. In [Google Cloud Console](https://console.cloud.google.com/), create/select a
-   project. Enable **Google Calendar API** and **Google Sheets API**.
-2. Under **Google Auth Platform**, configure Branding (app name/support email),
-   Audience (Internal if available, otherwise External), and Data Access for the
-   three scopes listed below. For an External app in Testing, add your Google
-   account as a test user. Google may expire testing refresh tokens; reconnect
-   when required. Workspace administrator approval may be needed.
-3. Under **Clients**, create an OAuth client with application type **Desktop app**.
-   Download its JSON outside this repository, e.g. into a private directory under
-   your home directory. Protect the file; never send its contents to the assistant.
-4. Run the guided setup below. After browser consent, it lists your writable
-   calendars **by name**; choose the clinic calendar. You do not need to find its ID.
-   Setup asks whether to **create a new spreadsheet** or **use an existing one**.
-   For an existing spreadsheet, paste its ordinary Google Sheets URL. For a new
-   one, choose its title. Setup owns the `Appointments` and `Daily Summary` format;
-   incompatible existing headers are refused before changes. Spreadsheet creation
-   is setup-only and is unavailable to both running agents.
-5. From your workspace root, the creation assistant can start this in a terminal:
-
-```sh
-doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py google-setup --client "$HOME/private/desktop-client.json"
-doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py google-status
-doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py open-spreadsheet
-```
-
-The JSON path above is an example; use your actual downloaded client path. The
-guided setup saves the selected resource IDs internally as non-secret configuration. Keep `clinic_id` synthetic
-until trusted live identity integration is implemented. OAuth opens a browser or
-prints the authorization URL. The local helper handles a random-port loopback
-callback, OAuth state validation and offline consent via `InstalledAppFlow`.
-It stores credentials only in **macOS Keychain** after verifying both resources. Creating a new register or initializing empty
-owned worksheets performs explicit setup writes; no appointment is created.
-No deprecated out-of-band or invented device flow is used. Missing Keychain
-backend stops the operation, with no plaintext fallback. No token is printed.
-A 180-second consent timeout can be retried. API write access remains unverified
-until a consented write actually succeeds.
-
-Scopes: `calendar.events` for event management, `calendar.readonly` for explicit
-calendar metadata and busy checks, and `spreadsheets` for register read/write.
-No Drive, Gmail or general Calendar MCP access. Google grants scopes across the
-account's accessible resources; trusted adapters restrict calls to configured IDs.
-
-Revoke Google authorization and delete stored credentials:
-
-```sh
-doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py google-revoke
-```
-
-Revocation must succeed before local deletion, so a failed network request can be
-retried. If the machine is lost, revoke the app from your Google Account's
-third-party connections. No secrets are kept in configuration, logs or Git.
-
-## Real Google synthetic verification: blocked pending security prerequisites
-
-```sh
-doctor-assistant/.venv/bin/python doctor-assistant/tools/admin.py synthetic-google-test
-```
-
-This operation deliberately refuses writes while trusted gateway identity,
-independent human-confirmation provenance and the OS credential boundary are
-unverified. No flag or conversational override enables it. `tools/verification.py`
-contains the staged workflow for use after those prerequisites are implemented
-and audited: verify selected resources; obtain human CREATE consent; create and
-read back one stable synthetic Calendar event; reconcile/open actual Sheets;
-wait for human row verification; reconcile again and reject duplicate IDs;
-obtain separate CANCEL consent; verify cancellation in Calendar and Sheets;
-check isolated synthetic identities; rerun actual CLI permission audit. It prints
-a recovery event ID before the write and reports pending cleanup on interruptions.
-**This workflow has been tested with mocks, not with live Google.**
-
-The `Appointments` worksheet contains ID, start/end, status, kind, last-seen and
-issue. `Daily Summary` aggregates day/status counts. Issues fit in the appointment
-row, so no extra Sync Issues worksheet is created. Unexpected deletion retains
-history and marks review required. Logical cancellation retains the Calendar
-record, marks private clinic status `cancelled`, and makes it transparent; it
-does not delete audit history. Reconciliation never rolls back Calendar bookings.
 
 ## Verified restrictions and remaining limits
 
@@ -283,10 +321,9 @@ configuration. A terminal exposed to untrusted humans needs managed policy and
 OS account boundaries before real-patient use. No configuration file can replace
 those boundaries. Real mode stays gated in trusted code.
 
-Google authorization has not been performed. Google connection during creation
-requires a Desktop OAuth client and browser consent; live Calendar/Sheets writes
-remain unverified. Calendar has no atomic reservation guarantee, external writers
-can race rechecks, and overlapping live reschedules are conservatively rejected.
-The staged real-resource synthetic verification is still gated by unresolved
-security prerequisites. This is a working native practice package, not certification
-for real patient data. Nothing sensitive is published.
+Google mode has been exercised end to end with synthetic identities (booking,
+register sync, duplicate retry, isolation, cancellation) on the publisher's
+machine. Calendar has no atomic reservation guarantee, external writers can race
+rechecks, and overlapping live reschedules are conservatively rejected. The
+trusted helper runs as the same OS user as the sessions. This is not
+certification for real patient data. Nothing sensitive is published.

@@ -7,3 +7,16 @@ config/native-e2e-report.json
 *.log
 **/.codex/*
 !**/.codex/config.toml
+config/local-bookings.*
+config/storage.json
+config/live-activation.json
+config/live.lock
+config/notices-seen.*
+config/doctor-alerts.*
+config/runtime
+evals/runs/
+**/.claude/settings.local.json
+evals/RESULTS.md
+evals/dashboard.html
+evals/baseline-agent-snapshot/
+tests/conversations/

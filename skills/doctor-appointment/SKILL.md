@@ -65,10 +65,11 @@ minutes and I'll handle the technical side. First, what's the clinic called?"
    How the doctor takes bookings: "Do you like patients to pick set appointment
    times, or would you rather just see a number of patients each day?" For set
    times keep the default (`booking_mode=slots`). For a number per day, ask "How
-   many new patients and how many follow-ups would you like to see in a day?",
-   then save `booking_mode=count daily_caps='{"consultation":N,"follow_up":M}'`
-   and add one sentence: when a day fills up, their assistant will check with them
-   before taking more.
+   many patients would you like to see in a day?" If they give one number, save
+   `booking_mode=count daily_caps='{"total":N}'` and don't ask for a split. Only
+   if they split it themselves (e.g. "6 new and 4 follow-ups"), save
+   `daily_caps='{"consultation":6,"follow_up":4}'`. Then add one sentence: when a
+   day fills up, their assistant will check with them before taking more.
 4. **Ask where bookings should be kept**, in two plain sentences, then the
    question. For example: "Last big choice: where should the appointments live?
    In your Google Calendar, so you can see them on your phone and get a

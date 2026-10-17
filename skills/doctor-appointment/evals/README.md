@@ -5,12 +5,12 @@ isolated synthetic copy of this package per case (never the live Google config),
 grades each turn with deterministic state/tool/reply checks plus a Haiku judge.
 
 ```sh
-python3 evals/golden_eval.py                                   # both suites, current prompts
+python3 evals/golden_eval.py                                   # all suites, current prompts
 python3 evals/golden_eval.py --cases B09,X05 --label retry-1     # subset (IDs or prefixes: P, SD, ...)
 python3 evals/golden_eval.py --agent-snapshot evals/baseline-agent-snapshot --label baseline   # other prompts (below)
 ```
 
-- Scenarios: `tests/scenarios/golden_dataset.json` (42) and `tests/scenarios/sunrise_suite.json` (64, from the spec).
+- Scenarios: `tests/scenarios/golden_dataset.json` (42), `sunrise_suite.json` (64, from the E2E spec) and `count_mode.json` (12).
 - Live status: `evals/dashboard.html` (all runs; auto-refresh while running) and `evals/RESULTS.md`.
 - Per run: `evals/runs/<label>/dashboard.html`, `RESULTS.md`, `cases/<ID>/result.json`, frozen `agent-snapshot/`.
 - Transcripts: `tests/conversations/<ID>.md` (latest run of each case).

@@ -13,7 +13,7 @@ isolated synthetic copy of the package; the live Google configuration was never 
 | `tests/scenarios.json` + `tests/run_conversation_eval.py` | 45-turn E2E script | your existing script |
 
 Runner: `python3 evals/golden_eval.py` (see `evals/README.md`). Live dashboard:
-`evals/dashboard.html`. Transcripts: `tests/conversations/<ID>.md`.
+`evals/dashboard.html`. Transcripts are written to `tests/conversations/` (generated, not committed).
 
 ## Results: original vs. fixed prompts (same harness, 106 cases each)
 
@@ -28,7 +28,7 @@ Your E2E script on Haiku:
 | Prompts | Result |
 |---|---|
 | original | stopped at turn 11/45 |
-| final | **PASSED: 45/45 turns, 22/22 final checks**, all actors `claude-haiku-5-5` (`evals/script-final5.log`) |
+| final | **PASSED: 45/45 turns, 22/22 final checks**, all actors `claude-haiku-5-5` |
 
 **Single runs are noisy.** Haiku is non-deterministic: E04/E06 failed on the original
 prompts in the first baseline and passed in `baseline-final`; P18 passed 2 of 3 retests.
@@ -54,8 +54,9 @@ Treat any single pass/fail as one sample. For release gating, run each case 3× 
 | 14 | Named patient without a date: asked for a date instead of looking | doctor | SD10 | scan next 5 working days |
 | 15 | Called Monday "tomorrow" | doctor | SD03 | name the date unless it really is tomorrow |
 
-Originals are saved in `evals/baseline-agent-snapshot/`. Each run freezes the prompts it
-tested in `evals/runs/<run>/agent-snapshot/`.
+The original prompts are in commit `f8d2828` (see `evals/README.md` to run them
+as a baseline). Each run freezes the prompts it tested in
+`evals/runs/<run>/agent-snapshot/`.
 
 ## Test-data defects fixed (not agent bugs)
 

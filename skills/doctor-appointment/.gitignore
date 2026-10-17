@@ -18,4 +18,5 @@ evals/runs/
 **/.claude/settings.local.json
 evals/RESULTS.md
 evals/dashboard.html
-evals/baseline-agent-snapshot/*.orig
+evals/baseline-agent-snapshot/
+tests/conversations/

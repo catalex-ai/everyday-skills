@@ -131,6 +131,47 @@ class CountConfigTests(unittest.TestCase):
 
 
 
+class TotalCapTests(unittest.TestCase):
+    """One shared cap: the doctor need not split new patients from follow-ups."""
+    def setUp(self):
+        self.state=fixture();self.cal=MockCalendar(self.state['events']);self.sheets=MockSheets()
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        self.alerts=AlertLog(Path(self.tmp.name)/'doctor-alerts.json')
+        config=copy.deepcopy(DEFAULT)|{'booking_mode':'count','daily_caps':{'total':2}}
+        def make(subject,role):
+            s=Service(Identity(subject,role,'synthetic-clinic','synthetic',True),self.cal,self.sheets,config)
+            s.alerts=self.alerts;return s
+        self.a=make('patient-a','patient');self.b=make('patient-b','patient');self.doc=make('synthetic-doctor','doctor')
+        self.day=self.state['events']['a-demo']['start'][:10]
+        del self.cal.events['b-demo']
+    def confirm(self,s,tool,args):
+        first=s.call(tool,args);self.assertTrue(first.get('confirmation_required'),first)
+        return s.call(tool,args|{'confirmation_token':first['confirmation_token']})
+    def test_total_cap_is_valid_and_a_mix_is_not(self):
+        validate_config(copy.deepcopy(DEFAULT)|{'daily_caps':{'total':10}})
+        with self.assertRaises(ValueError):validate_config(copy.deepcopy(DEFAULT)|{'daily_caps':{'total':10,'consultation':5}})
+    def test_new_patient_is_not_asked_for_category(self):
+        booked=self.confirm(self.b,'book_my_appointment',{'start':self.day,'request_id':'total-b-001'})
+        self.assertEqual(booked['appointment']['category'],'consultation')
+    def test_any_visit_type_shares_the_places_and_alerts_once_full(self):
+        self.confirm(self.a,'book_my_appointment',{'start':self.day,'request_id':'total-a-001'})
+        self.assertEqual(self.a.call('get_available_slots',{'day':self.day})['places'],{'total':{'cap':2,'booked':1,'open':1}})
+        self.confirm(self.b,'book_my_appointment',{'start':self.day,'request_id':'total-b-001'})
+        self.assertEqual([(x['category'],x['cap']) for x in self.alerts.pending()],[('total',2)])
+        told=self.doc.call('doctor_get_schedule',{'day':self.day})['tell_doctor_first']
+        self.assertIn('2 of 2 patient places',told[0])
+        full=self.a.call('book_my_appointment',{'start':self.day,'request_id':'total-a-002'})
+        self.assertTrue(full['full'])
+    def test_one_day_total_override(self):
+        first=self.doc.call('doctor_configure_clinic',{'changes':{'day_caps':{self.day:{'total':5}}}})
+        saved=self.doc.call('doctor_configure_clinic',{'changes':{'day_caps':{self.day:{'total':5}}},'confirmation_token':first['confirmation_token']})
+        self.assertEqual(saved['configuration']['day_caps'][self.day],{'total':5})
+        self.assertEqual(self.doc.places(date.fromisoformat(self.day))['total']['cap'],5)
+    def test_split_day_override_on_total_needs_both_counts(self):
+        self.assertEqual(combine_caps({'total':10},{'consultation':6,'follow_up':4}),{'consultation':6,'follow_up':4})
+        self.assertEqual(combine_caps({'consultation':6,'follow_up':4},{'total':12}),{'total':12})
+        self.assertEqual(combine_caps({'consultation':6,'follow_up':4},{'consultation':8}),{'consultation':8,'follow_up':4})
+
 class CountRuntimeTests(unittest.TestCase):
     def test_practice_runtime_records_and_shows_alert_across_sessions(self):
         from server import PracticeRuntime

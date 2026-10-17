@@ -47,8 +47,7 @@ Both talk like a person at the front desk: short plain messages, a simple
 Try: Patient: "What's free on Tuesday?", "Book me Tuesday at 10:20", "Move my
 appointment to Friday", "Cancel my appointment". Doctor: "Show tomorrow's
 schedule", "Book Patient B Tuesday at 3", "Block Thursday 2 to 4", "Set
-appointments to 20 minutes", "From now on, 10 consultations and 5 follow-ups a
-day", "On Friday I'll take 15", "Sync the register".
+appointments to 20 minutes", "From now on, 10 patients a day", "On Friday I'll take 15", "Sync the register".
 
 ### Set times or a number of patients per day
 
@@ -56,10 +55,12 @@ A clinic runs in one of two booking modes, chosen in setup and changeable later
 by telling the Doctor Assistant:
 
 - **Set times** (default): patients pick from the clinic's appointment times.
-- **Number per day**: no times. The doctor sets how many first consultations and
-  follow-ups a day takes ("10 consultations and 5 follow-ups a day"), and can
-  change one day ("on Thursday I'll take 15"). Patients book a place on a day;
-  returning patients count as follow-ups automatically and new patients are asked.
+- **Number per day**: no times. The doctor sets how many patients a day takes
+  ("10 patients a day"), optionally split into new patients and follow-ups ("6
+  new and 4 follow-ups"), and can change one day ("on Thursday I'll take 15").
+  Patients book a place on a day. With one total nobody is asked about visit
+  type; with a split, returning patients count as follow-ups automatically and
+  new patients are asked.
   When a day fills up, the booking that took the last place records an alert in
   `config/doctor-alerts.json` (for a messaging connector to pick up) and the
   Doctor Assistant's next reply asks the doctor whether to take more that day.

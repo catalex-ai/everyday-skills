@@ -55,14 +55,24 @@ DEFAULT = dict(clinic_id='synthetic-clinic', clinic_name='Practice Clinic', time
     calendar_id='', spreadsheet_id='', confirmation_policy='Confirm the selected slot before booking.',
     cancellation_policy='Confirm cancellation before submitting.',
     # 'slots': patients pick a set start time. 'count': the doctor caps how many
-    # consultations and follow-ups a day takes; patients book a place that day.
+    # patients a day takes, either in total or split into consultations and
+    # follow-ups; patients book a place that day.
     booking_mode='slots', daily_caps={'consultation':10,'follow_up':5}, day_caps={})
 CATEGORIES=('consultation','follow_up')
+TOTAL='total'  # one shared cap for every kind of visit
 COUNT_FIELDS=('booking_mode','daily_caps','day_caps')
 
 def valid_caps(caps,partial=False):
-    if not isinstance(caps,dict) or set(caps)-set(CATEGORIES) or (not partial and set(caps)!=set(CATEGORIES)):raise ValueError('Caps need consultation and follow_up counts')
+    if not isinstance(caps,dict) or set(caps)-{TOTAL,*CATEGORIES}:raise ValueError('Caps need a total, or consultation and follow_up counts')
+    if TOTAL in caps and len(caps)>1:raise ValueError('Give either a total or consultation and follow_up counts, not both')
+    if not partial and TOTAL not in caps and set(caps)!=set(CATEGORIES):raise ValueError('Caps need a total, or consultation and follow_up counts')
     if any(type(v) is not int or not 0<=v<=500 for v in caps.values()):raise ValueError('Caps must be whole numbers from 0 to 500')
+
+def combine_caps(base,override):
+    """A day's override on top of the usual caps. A total replaces a split and the
+    reverse; a partial split fills its missing count from the usual split."""
+    if TOTAL in override or not override:return dict(override or base)
+    return (base if TOTAL not in base else {})|override
 
 def validate_config(c):
     c = {k:copy.deepcopy(DEFAULT[k]) for k in COUNT_FIELDS if k not in c} | c  # configs saved before count mode
@@ -225,7 +235,8 @@ class Service:
         return sorted(set(starts))
     def on_grid(self, a):return a in self.grid(a.date())
     def count_mode(self):return self.config['booking_mode']=='count'
-    def caps_for(self,d):return self.config['daily_caps']|self.config['day_caps'].get(d.isoformat(),{})
+    def caps_for(self,d):return combine_caps(self.config['daily_caps'],self.config['day_caps'].get(d.isoformat(),{}))
+    def pool(self,d,category):return TOTAL if TOTAL in self.caps_for(d) else category
     def window(self,d):
         z=ZoneInfo(self.config['timezone'])
         return datetime.combine(d,time.fromisoformat(self.config['opening']),z),datetime.combine(d,time.fromisoformat(self.config['closing']),z)
@@ -242,19 +253,19 @@ class Service:
                 and e['id']!=exclude and (category is None or e.get('category')==category)]
     def places(self,d,exclude=None):
         caps=self.caps_for(d);out={}
-        for cat in CATEGORIES:
-            booked=len(self.day_bookings(d,cat,exclude));out[cat]={'cap':caps[cat],'booked':booked,'open':max(0,caps[cat]-booked)}
+        for key,cap in caps.items():
+            booked=len(self.day_bookings(d,None if key==TOTAL else key,exclude));out[key]={'cap':cap,'booked':booked,'open':max(0,cap-booked)}
         return out
     def open_days(self,category,after,limit=5):
         days,d=[],after
         for _ in range(21):
             d+=timedelta(days=1)
-            if self.day_open(d) and self.places(d)[category]['open']>0:days.append(d.isoformat())
+            if self.day_open(d) and self.places(d)[self.pool(d,category)]['open']>0:days.append(d.isoformat())
             if len(days)>=limit:break
         return days
     def alert_if_full(self,d,category):
-        p=self.places(d)[category]
-        if self.alerts is not None and p['booked']>=p['cap']:self.alerts.raise_alert(d.isoformat(),category,p['cap'],p['booked'])
+        key=self.pool(d,category);p=self.places(d)[key]
+        if self.alerts is not None and p['booked']>=p['cap']:self.alerts.raise_alert(d.isoformat(),key,p['cap'],p['booked'])
     def book_count(self,start,request_id,confirmation_token=None,category=None,allow_over_cap=False):
         d=self.parse_day(start)
         ident=hashlib.sha256(f'{self.identity.clinic}:{self.identity.subject}:{request_id}'.encode()).hexdigest()
@@ -266,9 +277,10 @@ class Service:
         if not self.day_open(d):return {'conflict':True,'closed':True,'reason':'The clinic is not taking bookings that day.','alternatives':self.open_days(category or 'consultation',d)}
         if category is None:
             history=[e for e in self.cal.owned_events(self.identity.clinic,self.identity.subject) if e['kind']=='appointment' and e['status']!='cancelled']
-            if not history:return {'category_required':True,'question':'Is this a first consultation or a follow-up visit?'}
-            category='follow_up'
-        over=lambda:self.places(d)[category]['open']<=0 and not (self.booked_by_clinic and allow_over_cap)
+            if history:category='follow_up'
+            elif self.pool(d,'consultation')==TOTAL:category='consultation'  # one shared cap: no need to ask
+            else:return {'category_required':True,'question':'Is this a first consultation or a follow-up visit?'}
+        over=lambda:self.places(d)[self.pool(d,category)]['open']<=0 and not (self.booked_by_clinic and allow_over_cap)
         full=lambda:{'conflict':True,'full':True,'day':d.isoformat(),'category':category,'alternatives':self.open_days(category,d)}
         if over():return full()
         draft={'id':ident,'start':a.isoformat(),'end':b.isoformat(),'status':'confirmed','kind':'appointment','mode':'count','category':category,
@@ -341,7 +353,7 @@ class Service:
         if start and e.get('mode')=='count':
             day=self.parse_day(start);a,b=self.window(day);payload['start']=a.isoformat()
             if not self.day_open(day):return {'conflict':True,'closed':True,'alternatives':self.open_days(e['category'],day)}
-            if self.places(day,exclude=ident)[e['category']]['open']<=0:return {'conflict':True,'full':True,'day':day.isoformat(),'category':e['category'],'alternatives':self.open_days(e['category'],day)}
+            if self.places(day,exclude=ident)[self.pool(day,e['category'])]['open']<=0:return {'conflict':True,'full':True,'day':day.isoformat(),'category':e['category'],'alternatives':self.open_days(e['category'],day)}
         elif start:
             a,b=self.interval(start);payload['start']=a.isoformat()
             if not doctor and not self.on_grid(a):return {'conflict':True,'requested_start_status':'not_a_clinic_appointment_time','reason':'Not one of the clinic\'s appointment times (the time itself is free or unknown, not booked); offer one of the alternatives.','alternatives':self.slots(a.date().isoformat())}
@@ -389,9 +401,9 @@ class Service:
         if self.identity.role=='doctor' and self.alerts is not None and isinstance(result,dict):
             told=[]
             for a in self.alerts.deliver():
-                d=date.fromisoformat(a['day']);p=self.places(d)[a['category']]
-                if p['booked']<p['cap'] or d<datetime.now(ZoneInfo(self.config['timezone'])).date():continue  # reopened or past since
-                label='consultation' if a['category']=='consultation' else 'follow-up'
+                d=date.fromisoformat(a['day']);p=self.places(d).get(a['category'])
+                if not p or p['booked']<p['cap'] or d<datetime.now(ZoneInfo(self.config['timezone'])).date():continue  # reopened, re-split or past since
+                label={'consultation':'consultation','follow_up':'follow-up',TOTAL:'patient'}[a['category']]
                 told.append(f"{d.strftime('%a %d %b')}: {p['booked']} of {p['cap']} {label} places are booked, so patients asking for that day are being turned away. Ask the doctor whether to accept more {label}s that day (and how many) or keep it closed.")
             if told:result={'tell_doctor_first':told}|result
         return result
@@ -448,7 +460,7 @@ class Service:
                 merged={d:v for d,v in self.config['day_caps'].items() if d>=today}
                 for d,v in patch['day_caps'].items():
                     if v is None:merged.pop(d,None)
-                    else:valid_caps(v,partial=True);merged[d]=base|merged.get(d,{})|v
+                    else:valid_caps(v,partial=True);merged[d]=combine_caps(combine_caps(base,merged.get(d,{})),v)
                 patch=patch|{'day_caps':merged}
             c=validate_config(self.config|patch)
             needed=self.confirm('configure',c,args.get('confirmation_token'))
@@ -514,14 +526,14 @@ CONFIG_CHANGES=schema({
     'breaks':{'type':'array','items':{'type':'array','items':{'type':'string'},'minItems':2,'maxItems':2},'description':'Pairs of local HH:MM start/end times.'},
     'duration_minutes':{'type':'integer','minimum':5,'maximum':240,'description':'Appointment length in minutes.'},
     'buffer_minutes':{'type':'integer','minimum':0,'maximum':240,'description':'Symmetric clearance before AND after each appointment. Five minutes before and after means 5, not 10. Separate before/after settings are unsupported.'},
-    'booking_mode':{'type':'string','enum':['slots','count'],'description':'slots: patients pick set start times. count: no times; the doctor caps how many consultations and follow-ups each day takes.'},
-    'daily_caps':{'type':'object','properties':{c:{'type':'integer','minimum':0,'maximum':500} for c in CATEGORIES},'required':list(CATEGORIES),'additionalProperties':False,'description':'Usual places per working day in count mode.'},
-    'day_caps':{'type':'object','additionalProperties':{'type':['object','null'],'properties':{c:{'type':'integer','minimum':0,'maximum':500} for c in CATEGORIES},'additionalProperties':False},'description':'Per-day overrides keyed YYYY-MM-DD, e.g. {"2026-10-20":{"consultation":15}}. Only the days given change; null removes a day.'}
+    'booking_mode':{'type':'string','enum':['slots','count'],'description':'slots: patients pick set start times. count: no times; the doctor caps how many patients each day takes.'},
+    'daily_caps':{'type':'object','properties':{c:{'type':'integer','minimum':0,'maximum':500} for c in (TOTAL,*CATEGORIES)},'additionalProperties':False,'description':'Usual places per working day in count mode: {"total":N} for one shared limit, or {"consultation":N,"follow_up":M} for a split.'},
+    'day_caps':{'type':'object','additionalProperties':{'type':['object','null'],'properties':{c:{'type':'integer','minimum':0,'maximum':500} for c in (TOTAL,*CATEGORIES)},'additionalProperties':False},'description':'Per-day overrides keyed YYYY-MM-DD, e.g. {"2026-10-20":{"total":15}} or {"2026-10-20":{"consultation":15}}. Only the days given change; null removes a day.'}
 })
 ARGUMENTS={
  'get_available_slots':schema({'day':'string','preferred_start':'string'},['day']), 'get_my_appointments':schema(),
  'get_clinic_information':schema(),
- 'book_my_appointment':schema({'start':{'type':'string','description':'Slot mode: the exact slot start with offset. Count mode: the day, YYYY-MM-DD.'},'request_id':'string','confirmation_token':'string','category':{'type':'string','enum':list(CATEGORIES),'description':'Count mode only. Omit for a returning patient (follow_up is inferred); ask a new patient.'}},['start','request_id']),
+ 'book_my_appointment':schema({'start':{'type':'string','description':'Slot mode: the exact slot start with offset. Count mode: the day, YYYY-MM-DD.'},'request_id':'string','confirmation_token':'string','category':{'type':'string','enum':list(CATEGORIES),'description':'Count mode only. Omit first; ask only if the result has category_required.'}},['start','request_id']),
  'cancel_my_appointment':schema({'appointment_id':'string','confirmation_token':'string'},['appointment_id']),
  'reschedule_my_appointment':schema({'appointment_id':'string','start':'string','confirmation_token':'string'},['appointment_id','start']),
  'doctor_book_appointment':schema({'patient_reference':{'type':'string','enum':['patient-a','patient-b']},'start':'string','request_id':'string','confirmation_token':'string','category':{'type':'string','enum':list(CATEGORIES)},'allow_over_cap':{'type':'boolean','description':'Count mode: book even though the day is full. Only after the doctor explicitly agrees.'}},['patient_reference','start','request_id']),

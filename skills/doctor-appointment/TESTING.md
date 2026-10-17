@@ -20,12 +20,12 @@ Publisher checks:
 against a compromised publisher. Pin a trusted Git commit for repeatability.
 The full suite runs in CI on Python 3.11 and 3.14 without model/Google calls.
 
-Consumers use hash verification and `tools/smoke.py`, then run a local native
-runtime audit. They do not rebuild tools or repeat the entire suite. Google consent,
-Keychain behavior, trusted identity and effective permissions are machine-specific;
-prior publisher tests cannot verify them on another machine. Re-audit after runtime
-or policy changes. For changed code, run maintainer regressions with the shipped
-locked API dependencies:
+Doctor setup runs none of these checks. It installs the published tools, saves
+clinic details, then either keeps bookings on the computer (`use-laptop`) or signs
+in to Google and runs `activate`, whose only check is reading the chosen calendar
+and spreadsheet. Runtime audits (`tools/audit.py`) and the live synthetic
+book/cancel check (`admin.py synthetic-google-test`) are maintainer tools. For
+changed code, run maintainer regressions with the shipped locked dependencies:
 
 ```sh
 .venv/bin/python -m unittest discover -s tests -v

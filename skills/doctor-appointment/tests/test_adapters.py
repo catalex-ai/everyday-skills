@@ -58,6 +58,38 @@ class GoogleBoundaryTests(unittest.TestCase):
         c=object.__new__(Calendar);c.api=API();c.calendar_id='explicit';e=next(iter(fixture()['events'].values()))
         with self.assertRaises(Conflict):c.update(e,'etag-current')
         self.assertEqual(req.headers['If-Match'],'etag-current');self.assertNotIn('summary',c.api.body);self.assertNotIn('description',c.api.body)
+    def test_cancellation_removes_event_from_calendar_view(self):
+        # A cancelled appointment must not stay visible on the doctor's calendar,
+        # or it looks booked while availability (correctly) offers that slot.
+        req=Request()
+        class API:
+            def events(self):return self
+            def patch(self,**kw):self.body=kw['body'];return req
+        c=object.__new__(Calendar);c.api=API();c.calendar_id='explicit'
+        e=dict(next(iter(fixture()['events'].values())),status='cancelled')
+        c.update(e,'etag')
+        self.assertEqual(c.api.body['status'],'cancelled')
+        self.assertEqual(c.api.body['extendedProperties']['private']['clinicStatus'],'cancelled')
+        self.assertEqual(Calendar.encode(dict(e,status='confirmed'))['status'],'confirmed')
+    def test_cancel_and_sync_accept_cancelled_event_without_times(self):
+        from core import Service,Identity,DEFAULT
+        state=fixture();cal=MockCalendar(state['events']);sheets=MockSheets()
+        real_get=cal.get
+        def bare(ident):
+            e=real_get(ident)
+            return {k:v for k,v in e.items() if k not in ('start','end')} if e and e['status']=='cancelled' else e
+        cal.get=bare;managed=cal.managed_events
+        cal.managed_events=lambda clinic:[{k:v for k,v in e.items() if e['status']!='cancelled' or k not in ('start','end')} for e in managed(clinic)]
+        doctor=Service(Identity('d','doctor',DEFAULT['clinic_id'],'synthetic',True),cal,sheets)
+        args={'appointment_id':'a-demo'};d=doctor.call('doctor_cancel_appointment',args)
+        self.assertTrue(doctor.call('doctor_cancel_appointment',args|{'confirmation_token':d['confirmation_token']})['calendar_confirmed'])
+        doctor.call('doctor_sync_register',{})
+        self.assertTrue(doctor.call('doctor_sync_register',{})['synced']);self.assertEqual(sheets.records['a-demo']['status'],'cancelled')
+    def test_agreed_time_survives_google_round_trip(self):
+        e=dict(next(e for e in fixture()['events'].values() if e['kind']=='appointment'),agreed='a|b|confirmed')
+        raw=Calendar.encode(e);raw['status']='cancelled'  # deleted directly in Google Calendar
+        back=Calendar.decode(raw)
+        self.assertEqual(back['agreed'],'a|b|confirmed');self.assertEqual(back['status'],'cancelled');self.assertEqual(back['clinic_status'],'confirmed')
     def test_oauth_missing_installed_client(self):
         with tempfile.TemporaryDirectory() as d:
             p=Path(d)/'client.json';p.write_text(json.dumps({'web':{}}))
@@ -95,14 +127,15 @@ class GoogleBoundaryTests(unittest.TestCase):
         self.assertEqual(s.api.writes[0],s.api.writes[1]);self.assertEqual(s.api.writes[0]['body']['valueInputOption'],'RAW')
     def test_staged_google_workflow_with_mock_transports(self):
         state=fixture();c=MockCalendar(state['events']);s=MockSheets();day=state['events']['a-demo']['start'][:10]
-        answers=iter([day+'T14:00:00+05:30','CREATE SYNTHETIC TEST','ROW VERIFIED','CANCEL SYNTHETIC TEST'])
-        with patch('audit.audit',return_value={'sessions':'mocked','real_patient_enabled':False}):
-            out=verify_google(c,s,DEFAULT,lambda text:next(answers))
-        for k in ('calendar_verified','row_human_verified','no_duplicate_verified','cancellation_sync_verified','patient_isolation_verified'):self.assertTrue(out[k])
+        approvals=[]
+        out=verify_google(c,s,DEFAULT,day+'T14:00:00+05:30',lambda action,payload:approvals.append(action) or True,log=lambda m:None)
+        self.assertTrue(out['passed'],out);self.assertEqual(approvals,['book','cancel'])
+        self.assertEqual(out['duplicate_prevention']['calendar_events_for_owner'],1);self.assertEqual(out['duplicate_prevention']['register_id_count'],1)
         self.assertEqual(s.records[out['id']]['status'],'cancelled')
     def test_staged_google_refusal_does_not_write(self):
         state=fixture();c=MockCalendar(state['events']);s=MockSheets();day=state['events']['a-demo']['start'][:10]
-        answers=iter([day+'T14:00:00+05:30','NO'])
-        self.assertTrue(verify_google(c,s,DEFAULT,lambda text:next(answers))['aborted']);self.assertEqual(c.events,state['events']);self.assertEqual(s.records,{})
+        from core import Denied
+        with self.assertRaises(Denied):verify_google(c,s,DEFAULT,day+'T14:00:00+05:30',lambda action,payload:False,log=lambda m:None)
+        self.assertEqual(c.events,state['events']);self.assertEqual(s.records,{})
 
 if __name__=='__main__':unittest.main()

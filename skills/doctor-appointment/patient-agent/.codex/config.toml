@@ -43,6 +43,7 @@ args = ["../tools/server.py", "--role", "patient"]
 required = true
 default_tools_approval_mode = "approve"
 startup_timeout_sec = 20
+tool_timeout_sec = 150
 enabled_tools = ["book_my_appointment", "cancel_my_appointment", "get_available_slots", "get_clinic_information", "get_my_appointments", "reschedule_my_appointment"]
 
 [[hooks.PreToolUse]]

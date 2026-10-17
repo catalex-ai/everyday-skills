@@ -46,7 +46,8 @@ PATIENT = {'get_available_slots','get_my_appointments','book_my_appointment',
 DOCTOR = {'doctor_get_schedule','doctor_get_appointment','doctor_configure_clinic',
           'doctor_block_time','doctor_unblock_time','doctor_cancel_appointment',
           'doctor_reschedule_appointment','doctor_sync_register','doctor_sync_status',
-          'doctor_review_issues','doctor_open_spreadsheet','doctor_connection_status','doctor_verify_synthetic_appointment','doctor_book_appointment'}
+          'doctor_review_issues','doctor_open_spreadsheet','doctor_connection_status','doctor_verify_synthetic_appointment','doctor_book_appointment',
+          'doctor_get_clinic_settings'}
 
 DEFAULT = dict(clinic_id='synthetic-clinic', clinic_name='Practice Clinic', timezone='Asia/Kolkata',
     working_days=[0,1,2,3,4,5], opening='09:00', closing='17:00', breaks=[['13:00','14:00']],
@@ -75,6 +76,45 @@ def public_event(e):
     # No raw event summary/description/contact data reaches an agent.
     return {k:copy.deepcopy(e[k]) for k in ('id','start','end','status','kind') if k in e}
 
+# What the patient last agreed to, kept on the event so any change made by the
+# clinic (doctor assistant, or editing/deleting directly in Google Calendar) shows
+# up as a notice. NOT_AGREED marks an appointment the clinic booked for them.
+NOT_AGREED='clinic-booked'
+def agreed_state(e):return '|'.join((e['start'],e['end'],e['status']))
+
+def clinic_change(e):
+    agreed=e.get('agreed')
+    if e.get('kind')!='appointment' or 'start' not in e:return None
+    if agreed is None:  # booked before change tracking: only a direct deletion is detectable
+        return {'type':'cancelled_by_clinic'} if e.get('status')=='cancelled' and e.get('clinic_status')=='confirmed' else None
+    if agreed==NOT_AGREED:return {'type':'cancelled_by_clinic' if e['status']=='cancelled' else 'booked_by_clinic'}
+    if agreed==agreed_state(e):return None
+    was,was_end,was_status=agreed.split('|')
+    if e['status']=='cancelled' and was_status!='cancelled':return {'type':'cancelled_by_clinic','previous_start':was}
+    if e['start']!=was or e['end']!=was_end:return {'type':'moved_by_clinic','previous_start':was,'previous_end':was_end}
+    return None
+
+def notice_key(e):
+    change=e.get('clinic_change') or clinic_change(e)
+    return '|'.join((e['id'],change['type'],e['start'],e.get('end',''),e['status']))
+
+class NoticeLog:
+    """Clinic-change notices already delivered, per patient, in a local file."""
+    def __init__(self,path):self.path=Path(path)
+    def load(self,patient):
+        try:return set(json.loads(self.path.read_text()).get(patient,[]))
+        except (OSError,ValueError):return set()
+    def add(self,patient,keys):
+        with lock(self.path.with_suffix('.lock')):
+            try:data=json.loads(self.path.read_text())
+            except (OSError,ValueError):data={}
+            data[patient]=sorted(set(data.get(patient,[]))|set(keys))[-500:];atomic(self.path,data)
+
+def patient_event(e):
+    result=public_event(e);change=clinic_change(e)
+    if change:result['clinic_change']=change
+    return result
+
 def doctor_event(e):
     result=public_event(e)
     if e.get("kind")=="appointment" and e.get("owner"):
@@ -82,11 +122,18 @@ def doctor_event(e):
     return result
 
 class Service:
-    def __init__(self, identity, calendar, sheets, config=None, config_path=None):
+    def __init__(self, identity, calendar, sheets, config=None, config_path=None, approver=None, synthetic_directory=False):
         self.identity, self.cal, self.sheets = identity, calendar, sheets
         self.config = validate_config(copy.deepcopy(config or DEFAULT))
         self.config_path = config_path
         self.pending = {}
+        # approver: trusted out-of-band human confirmation (live mode). The model
+        # can relay a token but cannot answer the approver's channel.
+        self.approver = approver
+        # Live Google mode with the configured synthetic Patient A/B directory.
+        self.synthetic_directory = synthetic_directory
+        self.booked_by_clinic = False
+        self.notices_seen = None  # NoticeLog in running sessions: each clinic change is told once
     def authorize(self, tool):
         i = self.identity
         if not i.verified or i.clinic != self.config['clinic_id'] or i.source not in ('synthetic','gateway'): raise Denied('Verified identity required')
@@ -106,6 +153,7 @@ class Service:
             return {'confirmation_required':True,'confirmation_token':t,'action':action,'details':payload}
         entry=self.pending.pop(token,None)
         if not entry or entry[0]!=digest or entry[1]<datetime.now().timestamp(): raise Denied('Fresh action-specific confirmation required')
+        if self.approver is not None and self.approver(action,payload) is not True: raise Denied('Not approved in the independent confirmation dialog; nothing was changed')
         return None
     def interval(self, start):
         a=stamp(start).astimezone(ZoneInfo(self.config['timezone']))
@@ -123,21 +171,38 @@ class Service:
         return self.cal.busy(a-pad,b+pad,exclude)
     def available(self,a,b,exclude=None):
         return self.valid_hours(a,b) and not self.conflicts(a,b,exclude)
+    def grid(self, d):
+        """Every appointment start the clinic offers on day d: from opening and again
+        after each break, one appointment plus buffer apart. Patients book only these."""
+        z=ZoneInfo(self.config['timezone']); c=self.config
+        length=timedelta(minutes=c['duration_minutes']); step=length+timedelta(minutes=c['buffer_minutes'])
+        def at(v):return datetime.combine(d,time.fromisoformat(v),z)
+        starts=[]
+        for begin in sorted({c['opening'],*(y for x,y in c['breaks'])}):
+            a=at(begin)
+            if not at(c['opening'])<=a<at(c['closing']):continue
+            while a+length<=at(c['closing']) and self.valid_hours(a,a+length):
+                starts.append(a);a+=step
+        return sorted(set(starts))
+    def on_grid(self, a):return a in self.grid(a.date())
     def slots(self, day, preferred_start=None):
         d=date.fromisoformat(day); z=ZoneInfo(self.config['timezone']); c=self.config
-        a=datetime.combine(d,time.fromisoformat(c['opening']),z)
-        finish=datetime.combine(d,time.fromisoformat(c['closing']),z)
-        slots=[]
-        while a+timedelta(minutes=c['duration_minutes'])<=finish:
-            b=a+timedelta(minutes=c['duration_minutes'])
-            if a>datetime.now(z) and self.available(a,b): slots.append(a.isoformat())
-            a+=timedelta(minutes=c['duration_minutes']+c['buffer_minutes'])
+        length=timedelta(minutes=c['duration_minutes'])
+        slots=[a.isoformat() for a in self.grid(d) if a>datetime.now(z) and self.available(a,a+length)]
+        result={'slots':slots,'timezone':c['timezone']}
         if preferred_start:
             preferred=stamp(preferred_start).astimezone(z)
             if preferred.date()!=d:raise ValueError('Requested start must match day in clinic timezone')
-            finish=preferred+timedelta(minutes=c['duration_minutes'])
-            if preferred>datetime.now(z) and self.available(preferred,finish) and preferred.isoformat() not in slots:slots.append(preferred.isoformat())
-        return {'slots':sorted(slots),'timezone':c['timezone']}
+            # Only listed slots can be booked; say why another time cannot be, so the
+            # assistant never calls a free time between slots "booked".
+            result['requested_start_available']=preferred.isoformat() in slots
+            if preferred.isoformat() in slots:status='available'
+            elif not self.valid_hours(preferred,preferred+length):status='outside_clinic_hours'
+            elif not self.on_grid(preferred):status='not_a_clinic_appointment_time'
+            elif preferred<=datetime.now(z):status='in_the_past'
+            else:status='already_booked'
+            result['requested_start_status']=status
+        return result
     def book(self,start,request_id,confirmation_token=None):
         if not re.fullmatch(r'[A-Za-z0-9_-]{8,100}',request_id): raise ValueError('Request ID must contain 8–100 safe characters')
         a,b=self.interval(start)
@@ -146,8 +211,10 @@ class Service:
         if existing:
             if existing.get('owner')!=self.identity.subject or existing.get('start')!=a.isoformat(): raise Conflict('Request ID reused for different appointment')
             return {'calendar_confirmed':True,'appointment':public_event(existing)}
+        if not self.booked_by_clinic and not self.on_grid(a): return {'conflict':True,'requested_start_status':'not_a_clinic_appointment_time','reason':'Not one of the clinic\'s appointment times (the time itself is free or unknown, not booked); offer one of the alternatives.','alternatives':self.slots(a.date().isoformat())}
         if not self.available(a,b): return {'conflict':True,'alternatives':self.slots(a.date().isoformat())}
         draft={'id':ident,'start':a.isoformat(),'end':b.isoformat(),'status':'confirmed','kind':'appointment','owner':self.identity.subject,'clinic':self.identity.clinic}
+        draft['agreed']=NOT_AGREED if self.booked_by_clinic else agreed_state(draft)
         needed=self.confirm('book',draft,confirmation_token)
         if needed:return needed
         # Recheck immediately before the write; local lock cannot prevent external writers.
@@ -167,23 +234,27 @@ class Service:
         payload={'appointment_id':ident,'version':e.get('etag',json.dumps(e,sort_keys=True))}
         if start:
             a,b=self.interval(start);payload['start']=a.isoformat()
+            if not doctor and not self.on_grid(a):return {'conflict':True,'requested_start_status':'not_a_clinic_appointment_time','reason':'Not one of the clinic\'s appointment times (the time itself is free or unknown, not booked); offer one of the alternatives.','alternatives':self.slots(a.date().isoformat())}
             if not self.available(a,b,ident):return {'conflict':True,'alternatives':self.slots(a.date().isoformat())}
         needed=self.confirm(action,payload,token)
         if needed:return needed
         updated=copy.deepcopy(e)
         if action=='cancel':updated['status']='cancelled'
         else:updated.update(start=a.isoformat(),end=b.isoformat())
+        if not doctor:updated['agreed']=agreed_state(updated)  # the patient made this change
+        elif 'agreed' not in e and e.get('kind')=='appointment':updated['agreed']=agreed_state(e)  # booked before tracking
         try:self.cal.update(updated,e.get('etag'))
         except (TimeoutError,Uncertain):pass
         found=self.cal.get(ident)
-        if not found or any(found.get(k)!=updated.get(k) for k in ('start','end','status')): raise Uncertain('Change unverified; retry after reviewing Calendar')
+        # Google may return a cancelled event without its times; status alone proves a cancellation.
+        if not found or any(found.get(k)!=updated.get(k) for k in (('status',) if action=='cancel' else ('start','end','status'))): raise Uncertain('Change unverified; retry after reviewing Calendar')
         return {'calendar_confirmed':True,'appointment':public_event(found)}
     def sync(self):
         # Register is reporting state, never read by scheduling operations.
         records=self.sheets.read_records(); seen=set()
         for e in self.cal.managed_events(self.identity.clinic):
             if e.get('kind')!='appointment':continue
-            seen.add(e['id']); records[e['id']]=records.get(e['id'],{})|public_event(e)|{'last_seen':datetime.now().isoformat(),'issue':''}
+            seen.add(e['id']); records[e['id']]=records.get(e['id'],{})|(public_event(e) if 'start' in e and 'end' in e else {'status':e['status']})|{'last_seen':datetime.now().isoformat(),'issue':''}
         for ident,row in records.items():
             if ident not in seen and row.get('status')!='cancelled': row['issue']='missing_from_calendar_review_required'
         try:self.sheets.write_records(records)
@@ -191,6 +262,31 @@ class Service:
             return {'synced':False,'issue':'Sheets write failed; Calendar appointments remain accepted. Reconcile again.'}
         return {'synced':True,'rows':len(records),'issues':[{'id':k,'issue':v['issue']} for k,v in records.items() if v.get('issue')]}
     def call(self,tool,args):
+        result=self.handle(tool,args)
+        if self.identity.role=='patient' and isinstance(result,dict):
+            # Every patient answer carries upcoming clinic changes. The start-up
+            # banner (tools/notices.py) is the channel the model cannot skip.
+            now=datetime.now(ZoneInfo("UTC"))
+            changed=[e for e in self.cal.owned_events(self.identity.clinic,self.identity.subject) if clinic_change(e) and stamp(e['start'])>now]
+            if self.notices_seen is not None:
+                # Each change is told once: skip what the start-up message or an
+                # earlier answer already delivered.
+                seen=self.notices_seen.load(self.identity.subject)
+                changed=[e for e in changed if notice_key(e) not in seen]
+                if changed:self.notices_seen.add(self.identity.subject,[notice_key(e) for e in changed])
+            if changed:result={'tell_patient_first':[self.notice(e) for e in changed]}|result
+        return result
+    def notice(self,e):
+        """Plain sentence about a clinic-side change, in clinic time."""
+        z=ZoneInfo(self.config['timezone'])
+        def when(v):
+            t=stamp(v).astimezone(z);return t.strftime('%a %d %b, ')+t.strftime('%I:%M %p').lstrip('0').lower()
+        change=clinic_change(e) or e.get('clinic_change')
+        if change['type']=='moved_by_clinic':
+            return 'The clinic changed your appointment from '+when(change['previous_start'])+'–'+when(change.get('previous_end',change['previous_start'])).split(', ')[-1]+' to '+when(e['start'])+'–'+when(e['end']).split(', ')[-1]+'.'
+        if change['type']=='cancelled_by_clinic':return 'The clinic cancelled your appointment on '+when(e['start'])+'.'
+        return 'The clinic booked an appointment for you on '+when(e['start'])+'.'
+    def handle(self,tool,args):
         self.authorize(tool)
         schemas=ARGUMENTS[tool]
         if not isinstance(args,dict) or set(args)-set(schemas['properties']) or not set(schemas.get('required',[]))<=set(args): raise ValueError('Unknown or missing arguments')
@@ -200,18 +296,18 @@ class Service:
             if kind=='object' and not isinstance(v,dict):raise ValueError('Invalid object')
             if 'enum' in schemas['properties'][k] and v not in schemas['properties'][k]['enum']:raise ValueError('Unknown configured patient')
         if tool=='get_available_slots':return self.slots(args['day'],args.get('preferred_start'))
-        if tool=='get_my_appointments':return {'appointments':[public_event(e) for e in self.cal.owned_events(self.identity.clinic,self.identity.subject)]}
+        if tool=='get_my_appointments':return {'appointments':[patient_event(e) for e in self.cal.owned_events(self.identity.clinic,self.identity.subject)]}
         if tool=='book_my_appointment':return self.book(**args)
         if tool=='cancel_my_appointment':return self.change('cancel',args['appointment_id'],token=args.get('confirmation_token'))
         if tool=='reschedule_my_appointment':return self.change('reschedule',args['appointment_id'],args['start'],args.get('confirmation_token'))
-        if tool=='get_clinic_information':
+        if tool in ('get_clinic_information','doctor_get_clinic_settings'):
             public=('clinic_name','timezone','working_days','opening','closing','breaks','duration_minutes','buffer_minutes','address','contact','confirmation_policy','cancellation_policy')
             return copy.deepcopy({k:self.config[k] for k in public})|{'clinic_today':datetime.now(ZoneInfo(self.config['timezone'])).date().isoformat()}
         if tool=='doctor_book_appointment':
             from mock import MockCalendar
-            if not isinstance(self.cal,MockCalendar):raise Denied('Trusted live patient directory not configured')
-            patient=Service(Identity(args['patient_reference'],'patient',self.identity.clinic,'synthetic',True),self.cal,self.sheets,self.config)
-            patient.pending=self.pending
+            if not (isinstance(self.cal,MockCalendar) or self.synthetic_directory):raise Denied('Trusted live patient directory not configured')
+            patient=Service(Identity(args['patient_reference'],'patient',self.identity.clinic,'synthetic',True),self.cal,self.sheets,self.config,approver=self.approver)
+            patient.pending=self.pending;patient.booked_by_clinic=True
             return patient.book(args['start'],args['request_id'],args.get('confirmation_token'))
         if tool=='doctor_get_schedule':
             day=date.fromisoformat(args['day']);z=ZoneInfo(self.config['timezone']);a=datetime.combine(day,time(),z)
@@ -219,7 +315,7 @@ class Service:
         if tool=='doctor_get_appointment':return doctor_event(self.managed(args['appointment_id']))
         if tool=='doctor_configure_clinic':
             patch=args['changes']
-            if set(patch)-set(DEFAULT) or 'clinic_id' in patch:raise ValueError('Unknown or immutable field')
+            if set(patch)-set(DEFAULT) or set(patch)&SETUP_ONLY:raise ValueError('Unknown or immutable field')
             c=validate_config(self.config|patch)
             needed=self.confirm('configure',c,args.get('confirmation_token'))
             if needed:return needed
@@ -273,10 +369,13 @@ class Service:
         if tool=='doctor_connection_status':return self.cal.connection_status()
         raise Denied('Unknown operation')
 
+# Bound by trusted setup and live activation; agents can never redirect resources.
+SETUP_ONLY={'clinic_id','calendar_id','spreadsheet_id'}
+
 def schema(properties={},required=()):
     return {'type':'object','properties':{k:({'type':v} if isinstance(v,str) else v) for k,v in properties.items()},'required':list(required),'additionalProperties':False}
 CONFIG_CHANGES=schema({
-    **{k:{'type':'string'} for k in DEFAULT if k not in ('clinic_id','working_days','breaks','duration_minutes','buffer_minutes')},
+    **{k:{'type':'string'} for k in DEFAULT if k not in SETUP_ONLY|{'working_days','breaks','duration_minutes','buffer_minutes'}},
     'working_days':{'type':'array','items':{'type':'integer','minimum':0,'maximum':6},'minItems':1,'description':'Monday=0 through Sunday=6.'},
     'breaks':{'type':'array','items':{'type':'array','items':{'type':'string'},'minItems':2,'maxItems':2},'description':'Pairs of local HH:MM start/end times.'},
     'duration_minutes':{'type':'integer','minimum':5,'maximum':240,'description':'Appointment length in minutes.'},
@@ -296,5 +395,5 @@ ARGUMENTS={
  'doctor_unblock_time':schema({'appointment_id':'string','confirmation_token':'string'},['appointment_id']),
  'doctor_cancel_appointment':schema({'appointment_id':'string','confirmation_token':'string'},['appointment_id']),
  'doctor_reschedule_appointment':schema({'appointment_id':'string','start':'string','confirmation_token':'string'},['appointment_id','start']),
- **{k:schema() for k in ('doctor_sync_register','doctor_sync_status','doctor_review_issues','doctor_open_spreadsheet','doctor_connection_status','doctor_verify_synthetic_appointment')}
+ **{k:schema() for k in ('doctor_sync_register','doctor_sync_status','doctor_review_issues','doctor_open_spreadsheet','doctor_connection_status','doctor_verify_synthetic_appointment','doctor_get_clinic_settings')}
 }

@@ -43,7 +43,8 @@ args = ["../tools/server.py", "--role", "doctor"]
 required = true
 default_tools_approval_mode = "approve"
 startup_timeout_sec = 20
-enabled_tools = ["doctor_block_time", "doctor_book_appointment", "doctor_cancel_appointment", "doctor_configure_clinic", "doctor_connection_status", "doctor_get_appointment", "doctor_get_schedule", "doctor_open_spreadsheet", "doctor_reschedule_appointment", "doctor_review_issues", "doctor_sync_register", "doctor_sync_status", "doctor_unblock_time", "doctor_verify_synthetic_appointment"]
+tool_timeout_sec = 150
+enabled_tools = ["doctor_block_time", "doctor_book_appointment", "doctor_cancel_appointment", "doctor_configure_clinic", "doctor_connection_status", "doctor_get_appointment", "doctor_get_clinic_settings", "doctor_get_schedule", "doctor_open_spreadsheet", "doctor_reschedule_appointment", "doctor_review_issues", "doctor_sync_register", "doctor_sync_status", "doctor_unblock_time", "doctor_verify_synthetic_appointment"]
 
 [[hooks.PreToolUse]]
 matcher = ".*"

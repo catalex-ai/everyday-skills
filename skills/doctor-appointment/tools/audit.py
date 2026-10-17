@@ -86,6 +86,11 @@ def codex_audit(role):
         network=probe(['/usr/bin/curl','--noproxy','*','--max-time','3','https://example.com'])
         network['baseline_access_verified']=baseline.returncode==0
         network['denied']=network['denied'] and network['baseline_access_verified']
+        # Credential probes: attribute lookup only (never -w/-g), output discarded.
+        from google_adapter import SERVICE,ACCOUNT
+        credential={'keychain':probe(['/usr/bin/security','find-generic-password','-s',SERVICE,'-a',ACCOUNT]),
+            'provider_auth':probe(['/bin/cat',str(folder/'.codex'/'auth.json')])}
+        for v in credential.values():v.pop('canary_leaked',None)
         write_absent=not write.exists()
         canary.unlink()
         if write.exists():write.unlink() # remove only our known harmless probe
@@ -94,8 +99,8 @@ def codex_audit(role):
             for skill in entry.get('skills',[]):
                 if str(folder/'.agents'/'skills') in str(skill.get('path','')):paths.append(Path(skill['path']).parent.name)
         expected_skill='appointments' if role=='patient' else 'clinic'
-        passed=model_match and names=={'clinic'} and tools==expected and feature_check and approval=='never' and actual_profile and read['denied'] and not read['canary_leaked'] and modify['denied'] and write_absent and network['denied'] and expected_skill in paths
-        return {'status':'passed' if passed else 'failed','actual_model':actual_model,'configured_model_verified':model_match,'mcp_servers':sorted(names),'actual_clinic_tools':sorted(tools),'effective_disabled_features':{k:config.get('features',{}).get(k) for k in disabled},'active_permission_profile':actual_profile,'approval_policy':approval,'instruction_sources':thread.get('instructionSources',[]),'native_skills':paths,'filesystem_read_probe':read,'filesystem_write_probe':modify,'write_probe_file_absent':write_absent,'network_probe':network,'builtin_tool_inventory':{'status':'unverified','reason':'Native MCP inventory and effective config verified; complete built-in model schema not exposed by this audit'},'config_api_verified':True}
+        passed=model_match and names=={'clinic'} and tools==expected and feature_check and approval=='never' and actual_profile and read['denied'] and not read['canary_leaked'] and modify['denied'] and write_absent and network['denied'] and expected_skill in paths and all(v['denied'] for v in credential.values())
+        return {'credential_probes':credential,'status':'passed' if passed else 'failed','actual_model':actual_model,'configured_model_verified':model_match,'mcp_servers':sorted(names),'actual_clinic_tools':sorted(tools),'effective_disabled_features':{k:config.get('features',{}).get(k) for k in disabled},'active_permission_profile':actual_profile,'approval_policy':approval,'instruction_sources':thread.get('instructionSources',[]),'native_skills':paths,'filesystem_read_probe':read,'filesystem_write_probe':modify,'write_probe_file_absent':write_absent,'network_probe':network,'builtin_tool_inventory':{'status':'unverified','reason':'Native MCP inventory and effective config verified; complete built-in model schema not exposed by this audit'},'config_api_verified':True}
     finally:rpc.close()
 
 def claude_audit(role):
@@ -107,7 +112,7 @@ def claude_audit(role):
     return result
 
 def audit(runtime='both'):
-    result={'time':datetime.now(timezone.utc).isoformat(),'version':'0.2.0','mode':'synthetic-only','runtimes':{},'real_patient_enabled':False,'os_credential_boundary':'unverified: same-UID helper and Keychain ACLs not isolated','gateway_identity':'unverified: no trusted live identity broker configured','human_confirmation_provenance':'unverified: model-visible tokens are not proof of consent','google_live_verification':'unverified: no consented Google integration performed'}
+    result={'time':datetime.now(timezone.utc).isoformat(),'version':'0.2.0','mode':'synthetic-only','runtimes':{},'real_patient_enabled':False,'os_credential_boundary':'partial: agent sandboxes probed for Keychain/provider-auth denial; trusted MCP helper still runs as the same OS user','gateway_identity':'unverified: no trusted live identity broker configured','human_confirmation_provenance':'live mode: every write also requires approval in a macOS dialog the model cannot operate','google_live_verification':'unverified: no consented Google integration performed'}
     for name,fn in [('codex',codex_audit),('claude',claude_audit)]:
         if runtime not in ('both',name):continue
         value={'sessions':{}}

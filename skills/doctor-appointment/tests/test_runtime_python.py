@@ -47,5 +47,23 @@ class RuntimePythonTests(unittest.TestCase):
                 self.assertEqual(Path(data['prefix']).resolve(),environment.resolve())
                 self.assertEqual(data['argv'],['value with spaces','--role','patient'])
 
+    def test_already_in_environment_spelled_differently_does_not_reexec(self):
+        # macOS paths are case-insensitive: ~/work and ~/Work are the same folder.
+        with tempfile.TemporaryDirectory(prefix='ClinicCase') as root:
+            environment=Path(root)/'.venv';binary=environment/'bin'/'python'
+            binary.parent.mkdir(parents=True);binary.symlink_to(sys.executable)
+            other=Path(str(environment).replace('ClinicCase','clinicCASE'))
+            if not other.exists():self.skipTest('case-sensitive filesystem')
+            with patch.object(runtime_python.sys, 'prefix', str(other)), patch.object(runtime_python.os, 'execv') as execute:
+                runtime_python.ensure_package_interpreter(root)
+                execute.assert_not_called()
+
+    def test_reexec_happens_at_most_once(self):
+        with tempfile.TemporaryDirectory() as root:
+            environment=Path(root)/'.venv';binary=environment/'bin'/'python'
+            binary.parent.mkdir(parents=True);binary.symlink_to(sys.executable)
+            with patch.object(runtime_python.sys, 'prefix', str(Path(root)/'base')), patch.dict(runtime_python.os.environ,{'CLINIC_HELPER_REEXEC':'1'}), patch.object(runtime_python.os, 'execv') as execute:
+                runtime_python.ensure_package_interpreter(root)
+                execute.assert_not_called()
 
 if __name__=='__main__':unittest.main()

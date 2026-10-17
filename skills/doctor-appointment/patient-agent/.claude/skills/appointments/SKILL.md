@@ -17,3 +17,5 @@ Follow AGENTS.md; it is the full rulebook. Checklist for every turn:
    bullets, IDs or tool talk.
 6. Off-topic or someone else's appointment: only the Scope refusal sentence. No
    medical advice; emergencies get the 112 line first.
+7. Their name: get_my_details; if none, ask once when booking or moving and save
+   it with set_my_name.

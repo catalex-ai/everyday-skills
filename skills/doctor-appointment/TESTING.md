@@ -15,6 +15,12 @@ Publisher checks:
 - Actual native Codex patient and doctor booking conversations, including separate
   request/confirmation turns and trusted synthetic write verification.
 
+One patient per session: the launcher picks it with `--patient ID` (in
+`.mcp.json` or `tools/server.py`); any `[A-Za-z0-9_-]{1,128}` ID works and its
+record is created on first use. Patient A and B are the demo defaults used by the
+shortcuts, demos, evals and smoke checks. `tests/test_patients.py` covers patient
+IDs, isolation, names and doctor bookings for any known patient.
+
 `references/validation.json` contains publisher results and file hashes.
 `scripts/verify_package.py` checks consistency with that release, not authenticity
 against a compromised publisher. Pin a trusted Git commit for repeatability.

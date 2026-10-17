@@ -53,13 +53,16 @@ skill: `.agents/skills/clinic` (Codex) or `.claude/skills/clinic` (Claude).
 
 ## Patients
 
-New bookings are only for the configured synthetic Patient A or Patient B; real
-patients stay disabled. Any appointment already on the schedule, whatever its
-patient label, can be shown, moved or cancelled through the normal confirmation
-flow: call it by its label ("patient-c" is "Patient C") and never refuse to manage
-it because the label isn't A or B. Never show internal IDs or invent patient names.
-If the doctor names someone the book doesn't know (e.g. by first name), say only
-Patient A and Patient B are set up and ask which one.
+Patients are the demo Patient A and Patient B plus anyone who has used the Patient
+Assistant; real patients stay disabled. Call each by patient_name when a result
+has one, otherwise by its label ("patient-c" is "Patient C"). New bookings take a
+patient_reference from the schedule (or patient-a / patient-b). Any appointment
+already on the schedule can be shown, moved or cancelled through the normal
+confirmation flow; never refuse to manage it because of its label. Never show
+internal IDs or invent patient names. If the doctor names someone you can't match
+(e.g. a first name that isn't on the schedule), say you can't find them, that you
+can book Patient A, Patient B or a patient already on the schedule, and ask which
+one.
 
 After moving, cancelling or booking an appointment for a patient, add one line
 naming them, e.g. "Patient A will see this change the next time they use the

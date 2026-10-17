@@ -18,6 +18,10 @@ import google_adapter
 
 class OAuthSetupTests(unittest.TestCase):
     def setUp(self):
+        # A prompt must never read the runner's real stdin (it would wait forever
+        # while stdin stays open); tests that answer prompts patch input themselves.
+        no_prompt=patch('builtins.input',side_effect=AssertionError('unexpected prompt'))
+        no_prompt.start();self.addCleanup(no_prompt.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name) / 'package'
         self.root.mkdir()
@@ -96,8 +100,12 @@ class OAuthSetupTests(unittest.TestCase):
             self.assertFalse(any(e[0]=='authorize' for e in self.events))
 
     def test_missing_client_fails_before_oauth(self):
-        with patch.object(sys,'argv',['admin.py','google-setup','--client',str(Path(self.tmp.name)/'missing.json')]),contextlib.redirect_stderr(io.StringIO()):
+        # Answer the register question on the command line: a prompt would read the
+        # real stdin and wait forever whenever the test runner's stdin stays open.
+        argv=['admin.py','google-setup','--new-register','Clinic Schedule','--client',str(Path(self.tmp.name)/'missing.json')]
+        with patch.object(sys,'argv',argv),contextlib.redirect_stderr(io.StringIO()) as err:
             with self.assertRaises(SystemExit):admin.run()
+        self.assertIn('Desktop OAuth client JSON path does not exist',err.getvalue())
         self.assertFalse(any(e[0]=='authorize' for e in self.events))
 
     def test_missing_configuration_guides_operator_to_google_setup(self):
@@ -122,8 +130,9 @@ class OAuthSetupTests(unittest.TestCase):
 
     def test_package_client_path_rejected_before_oauth(self):
         inside=self.root/'client.json';inside.write_text('{}')
-        with patch.object(sys,'argv',['admin.py','google-setup','--client',str(inside)]),contextlib.redirect_stderr(io.StringIO()):
+        with patch.object(sys,'argv',['admin.py','google-setup','--new-register','Clinic Schedule','--client',str(inside)]),contextlib.redirect_stderr(io.StringIO()) as err:
             with self.assertRaises(SystemExit):admin.run()
+        self.assertIn('Keep the Desktop OAuth client JSON outside this package',err.getvalue())
         self.assertFalse(any(e[0]=='authorize' for e in self.events))
 
     def test_explicit_literal_primary_is_rejected_and_actual_calendar_id_is_saved(self):

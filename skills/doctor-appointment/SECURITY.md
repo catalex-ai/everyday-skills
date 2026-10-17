@@ -11,10 +11,13 @@ Patient listing uses a single composite patient-and-clinic filter at Google's
 server; repeated private property filters are OR, so separate clinic/owner filters
 would be unsafe. Availability uses busy intervals without event details.
 
-Patient A/B and the doctor are synthetic test identities selected outside chat by
-native MCP configuration. They cannot authorize real patient data. Doctor-side
-booking only accepts configured synthetic Patient A/B; a model-supplied arbitrary
-patient identity is rejected. Future live identity needs the broker in GATEWAY.md.
+Patients and the doctor are synthetic test identities selected outside chat by
+native MCP configuration: one patient per session, picked by the launcher with
+`--patient ID` (any `[A-Za-z0-9_-]{1,128}` ID; Patient A/B are the demo
+defaults). They cannot authorize real patient data. Doctor-side booking accepts
+only a patient the clinic already knows (a demo patient, one who has used the
+Patient Assistant, or one with bookings); a model-supplied unknown patient
+identity is rejected. Future live identity needs the broker in GATEWAY.md.
 Google OAuth grants application resource access, not patient/doctor identity.
 
 ## Native runtime configuration
@@ -60,7 +63,7 @@ native sessions, not just configuration files:
 - `thread/start` returns the active permission profile and actual instruction sources.
 - `skills/list` confirms role-specific native discovery.
 - `mcpServerStatus/list` queries connected, actual tool inventories and detects
-  unexpected servers/methods. Six patient methods and fourteen doctor methods.
+  unexpected servers/methods against the role's patient or doctor method set.
 - `codex sandbox -P clinic` runs synthetic OS probes: an outside-folder read,
   a file creation and network request are denied. A successful unsandboxed control
   request distinguishes network denial from an unrelated network failure.
@@ -120,5 +123,7 @@ and [Sheets values](https://developers.google.com/workspace/sheets/api/reference
 
 Doctor schedule/detail/block-conflict outputs include the appointment owner’s
 patient reference after doctor authorization, so the model can resolve patient
-requests without guessing. Patient outputs omit references and ownership fields.
+requests without guessing, plus `patient_name` when the patient gave one
+(`set_my_name`, kept in `config/patients.json`). Patient outputs omit references
+and ownership fields.
 Neither output includes contact details or raw descriptions.

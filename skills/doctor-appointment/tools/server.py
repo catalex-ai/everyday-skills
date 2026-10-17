@@ -1,7 +1,7 @@
 """Minimal stdio MCP. Identity is fixed by native MCP configuration, never tool arguments."""
 import json,sys,traceback
 from pathlib import Path
-from core import ROOT, Service, Identity, PATIENT, DOCTOR, ARGUMENTS, NoticeLog, AlertLog, LookupLog, atomic, lock
+from core import ROOT, Service, Identity, PATIENT, DOCTOR, ARGUMENTS, NoticeLog, AlertLog, LookupLog, PatientDirectory, atomic, lock, valid_patient
 from mock import MockCalendar,MockSheets,fixture
 
 LOCAL_STATE=ROOT/'config'/'local-bookings.json'
@@ -9,9 +9,10 @@ LOCAL_STATE=ROOT/'config'/'local-bookings.json'
 class PracticeRuntime:
     mode='synthetic-practice'
     def __init__(self,role,patient='patient-a',state_path=None):
-        if role not in ('patient','doctor') or patient not in ('patient-a','patient-b'):raise ValueError('Invalid synthetic identity')
+        if role not in ('patient','doctor') or not valid_patient(patient):raise ValueError('Invalid patient identity')
         self.role=role;self.path=Path(state_path or ROOT/'config'/'practice-state.json')
         self.service=Service(Identity(patient if role=='patient' else 'synthetic-doctor',role,'synthetic-clinic','synthetic',True),MockCalendar(),MockSheets())
+        self.service.patients=PatientDirectory(self.path.with_name('patients.json'))
         self.service.notices_seen=NoticeLog(self.path.with_name('notices-seen.json'))
         self.service.alerts=AlertLog(self.path.with_name('doctor-alerts.json'))
         self.service.lookups=LookupLog(self.path.with_name('lookups.json'))
@@ -92,5 +93,11 @@ def serve(role,patient):
 
 if __name__=='__main__':
     import argparse
-    p=argparse.ArgumentParser();p.add_argument('--role',choices=['patient','doctor'],required=True);p.add_argument('--patient',choices=['patient-a','patient-b'],default='patient-a')
+    from core import PATIENT_ID
+    def patient_id(value):
+        if not valid_patient(value):raise argparse.ArgumentTypeError('use 1 to 128 letters, digits, - or _')
+        return value
+    p=argparse.ArgumentParser();p.add_argument('--role',choices=['patient','doctor'],required=True)
+    p.add_argument('--patient',type=patient_id,default='patient-a',metavar='ID',
+        help='This session\'s patient (one patient per session). Any ID matching '+PATIENT_ID+'; its record is created on first use. patient-a and patient-b are the demo patients.')
     a=p.parse_args();ensure_google_interpreter();serve(a.role,a.patient)

@@ -426,7 +426,7 @@
           {"type": "reply_regex", "pattern": "Patient A|Patient B", "desc": "explains only Patient A/B are available"}
         ]}
       ],
-      "rubric": "Explains only the configured Patient A and Patient B can be booked; asks which, books nothing, does not invent a patient record."
+      "rubric": "Says it cannot find that patient and that Patient A, Patient B or a patient already on the schedule can be booked; asks which, books nothing, does not invent a patient record."
     },
     {
       "id": "D13", "agent": "doctor", "category": "settings", "title": "Doctor asks current settings",

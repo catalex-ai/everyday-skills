@@ -42,7 +42,8 @@ class Identity:
     verified: bool
 
 PATIENT = {'get_available_slots','get_my_appointments','book_my_appointment',
-           'cancel_my_appointment','reschedule_my_appointment','get_clinic_information'}
+           'cancel_my_appointment','reschedule_my_appointment','get_clinic_information',
+           'get_my_details','set_my_name'}
 DOCTOR = {'doctor_get_schedule','doctor_get_appointment','doctor_configure_clinic',
           'doctor_block_time','doctor_unblock_time','doctor_cancel_appointment',
           'doctor_reschedule_appointment','doctor_sync_register','doctor_sync_status',
@@ -203,11 +204,58 @@ def patient_event(e,timezone=None):
         if change:result['clinic_change']={'type':change['type']}|({'previous_day':day(change['previous_start'])} if 'previous_start' in change else {})
     return result
 
-def doctor_event(e):
+# One patient per session: the launcher picks it with --patient. Any safe ID is
+# a patient; patient-a and patient-b are the demo defaults. The record (the name
+# the patient gave) is made on first use.
+PATIENT_ID=r'[A-Za-z0-9_-]{1,128}'
+DEMO_PATIENTS=('patient-a','patient-b')
+def valid_patient(subject):return isinstance(subject,str) and re.fullmatch(PATIENT_ID,subject) is not None
+
+NAME_MAX=80
+class PatientDirectory:
+    """Patients this clinic knows and the names they gave. A local file shared by
+    both assistants (in memory without a path). Never in the calendar or the
+    spreadsheet."""
+    def __init__(self,path=None):self.path=Path(path) if path else None;self.memory={}
+    def _load(self):
+        if self.path is None:return self.memory
+        try:data=json.loads(self.path.read_text())
+        except (OSError,ValueError):return {}
+        return data if isinstance(data,dict) else {}
+    def _update(self,change):
+        if self.path is None:change(self.memory);return
+        with lock(self.path.with_suffix('.lock')):
+            data=self._load();change(data);atomic(self.path,data)
+    def get(self,subject):
+        record=self._load().get(subject)
+        return record if isinstance(record,dict) else {}
+    def known(self,subject):return subject in DEMO_PATIENTS or (valid_patient(subject) and isinstance(self._load().get(subject),dict))
+    def ensure(self,subject):
+        """Create a patient's record on first use."""
+        if not valid_patient(subject) or isinstance(self._load().get(subject),dict):return
+        def add(data):data.setdefault(subject,{})
+        self._update(add)
+    def set_name(self,subject,name):
+        def put(data):data[subject]=(data.get(subject) if isinstance(data.get(subject),dict) else {})|{'name':name}
+        self._update(put)
+
+def clean_name(value):
+    name=' '.join(value.split()) if isinstance(value,str) else ''
+    if not name or len(name)>NAME_MAX or any(not ch.isprintable() for ch in name):raise ValueError(f'Give a name of 1 to {NAME_MAX} characters')
+    return name
+
+def doctor_event(e,patients=None):
     result=public_event(e)
     if e.get("kind")=="appointment" and e.get("owner"):
         result["patient_reference"]=e["owner"]
+        record=patients.get(e["owner"]) if patients is not None else {}
+        if isinstance(record.get("name"),str) and record["name"]:result["patient_name"]=record["name"]
     return result
+
+def version_of(e):
+    # A change is bound to the event version. Without an ETag (local storage) use
+    # a digest: the raw event holds private fields the patient must not see.
+    return e.get('etag') or hashlib.sha256(json.dumps(e,sort_keys=True).encode()).hexdigest()
 
 class Service:
     def __init__(self, identity, calendar, sheets, config=None, config_path=None, approver=None, synthetic_directory=False):
@@ -224,6 +272,9 @@ class Service:
         self.notices_seen = None  # NoticeLog in running sessions: each clinic change is told once
         self.alerts = None  # AlertLog in running sessions: a reached cap is told to the doctor once
         self.lookups = None  # LookupLog in running sessions: patients' daily availability checks
+        self.patients = PatientDirectory()  # a file shared by both assistants in running sessions
+        self.patient_seen = False
+    def doctor_view(self,e):return doctor_event(e,self.patients)
     def authorize(self, tool):
         i = self.identity
         if not i.verified or i.clinic != self.config['clinic_id'] or i.source not in ('synthetic','gateway'): raise Denied('Verified identity required')
@@ -456,7 +507,7 @@ class Service:
         return {'calendar_confirmed':True,'appointment':public_event(found),'external_conflict_detected':bool(overlap),'sheets_status':'pending'}
     def change(self,action,ident,start=None,token=None,doctor=False):
         e=self.managed(ident) if doctor else self.owned(ident)
-        if action=='cancel' and e['status']=='cancelled':return {'calendar_confirmed':True,'appointment':public_event(e)}
+        if action=='cancel' and e['status']=='cancelled':return {'calendar_confirmed':True,'appointment':self.doctor_view(e) if doctor else public_event(e)}
         if action=='reschedule' and e['status']=='cancelled':raise Denied('Cancelled appointments cannot be rescheduled')
         late=False
         if not doctor:
@@ -466,7 +517,7 @@ class Service:
             if late and action=='reschedule':
                 return {'conflict':True,'too_late_to_move':True,'cutoff_hours':self.config['cancel_cutoff_hours'],
                         'reason':f"Appointments can't be moved within {self.config['cancel_cutoff_hours']} hours of the start; the patient can keep it or cancel (a late cancellation counts like a missed appointment)."}
-        payload={'appointment_id':ident,'version':e.get('etag',json.dumps(e,sort_keys=True))}
+        payload={'appointment_id':ident,'version':version_of(e)}
         if late:payload['late_cancellation']=True  # shown in the proposal: counts like a missed appointment
         day=None
         if start and not doctor and self.beyond_window(self.parse_day(start)):return self.beyond_window(self.parse_day(start))
@@ -501,7 +552,7 @@ class Service:
         # Google may return a cancelled event without its times; status alone proves a cancellation.
         if not found or any(found.get(k)!=updated.get(k) for k in (('status',) if action=='cancel' else ('start','end','status'))): raise Uncertain('Change unverified; retry after reviewing Calendar')
         if day:self.alert_if_full(day,e['category'])
-        return {'calendar_confirmed':True,'appointment':public_event(found) if doctor else patient_event(found,self.config['timezone'])}
+        return {'calendar_confirmed':True,'appointment':self.doctor_view(found) if doctor else patient_event(found,self.config['timezone'])}
     def mark_no_show(self,ident,no_show=True,token=None):
         """Doctor marks a past appointment as missed (or clears it). Enough no-shows
         stop a patient booking for themselves until the doctor clears one."""
@@ -509,25 +560,25 @@ class Service:
         if e['status']=='cancelled':
             # A late cancellation counts like a no-show; the doctor may excuse it.
             if no_show or not e.get('late_cancel'):return {'conflict':True,'reason':'Cancelled appointments cannot be marked; only a late cancellation can be excused (no_show false).'}
-            needed=self.confirm('mark_no_show',{'appointment_id':ident,'no_show':False,'start':e['start'],'owner':e.get('owner'),'version':e.get('etag',json.dumps(e,sort_keys=True))},token)
+            needed=self.confirm('mark_no_show',{'appointment_id':ident,'no_show':False,'start':e['start'],'owner':e.get('owner'),'version':version_of(e)},token)
             if needed:return needed
             updated=copy.deepcopy(e);updated['late_cancel']=False
             try:self.cal.update(updated,e.get('etag'))
             except (TimeoutError,Uncertain):pass
             found=self.cal.get(ident)
             if not found or found.get('late_cancel'):raise Uncertain('Change unverified; retry after reviewing Calendar')
-            return {'calendar_confirmed':True,'appointment':doctor_event(found)}
+            return {'calendar_confirmed':True,'appointment':self.doctor_view(found)}
         if stamp(e['start'])>datetime.now(ZoneInfo('UTC')):return {'conflict':True,'reason':'Only appointments that have already started can be marked as no-show.'}
         target='no_show' if no_show else 'confirmed'
-        if e['status']==target:return {'calendar_confirmed':True,'appointment':doctor_event(e)}
-        needed=self.confirm('mark_no_show',{'appointment_id':ident,'no_show':no_show,'start':e['start'],'owner':e.get('owner'),'version':e.get('etag',json.dumps(e,sort_keys=True))},token)
+        if e['status']==target:return {'calendar_confirmed':True,'appointment':self.doctor_view(e)}
+        needed=self.confirm('mark_no_show',{'appointment_id':ident,'no_show':no_show,'start':e['start'],'owner':e.get('owner'),'version':version_of(e)},token)
         if needed:return needed
         updated=copy.deepcopy(e);updated['status']=target
         try:self.cal.update(updated,e.get('etag'))
         except (TimeoutError,Uncertain):pass
         found=self.cal.get(ident)
         if not found or found.get('status')!=target:raise Uncertain('Change unverified; retry after reviewing Calendar')
-        return {'calendar_confirmed':True,'appointment':doctor_event(found)}
+        return {'calendar_confirmed':True,'appointment':self.doctor_view(found)}
     def sync(self):
         # Register is reporting state, never read by scheduling operations.
         records=self.sheets.read_records(); seen=set()
@@ -541,6 +592,8 @@ class Service:
             return {'synced':False,'issue':'Sheets write failed; Calendar appointments remain accepted. Reconcile again.'}
         return {'synced':True,'rows':len(records),'issues':[{'id':k,'issue':v['issue']} for k,v in records.items() if v.get('issue')]}
     def call(self,tool,args):
+        if self.identity.role=='patient' and not self.patient_seen:
+            self.patients.ensure(self.identity.subject);self.patient_seen=True  # the patient's record, made on first use
         if self.identity.role=='patient' and self.lookups is not None and isinstance(args,dict) and (
                 tool=='get_available_slots' or (tool in ('book_my_appointment','reschedule_my_appointment') and 'confirmation_token' not in args)):
             today=datetime.now(ZoneInfo(self.config['timezone'])).date().isoformat()
@@ -582,7 +635,7 @@ class Service:
             seen=[e for e in self.cal.schedule(datetime.combine(d,time(),z),datetime.combine(d,time(),z)+timedelta(days=1))
                   if e.get('kind')=='appointment' and e['status']=='confirmed' and e.get('owner') and stamp(e['start'])<now]
             self.notices_seen.add(self.identity.subject,[key])
-            if seen:out.append({'day':d.isoformat(),'appointments':[doctor_event(e) for e in sorted(seen,key=lambda e:e['start'])]})
+            if seen:out.append({'day':d.isoformat(),'appointments':[self.doctor_view(e) for e in sorted(seen,key=lambda e:e['start'])]})
         return out
     def notice(self,e):
         """Plain sentence about a clinic-side change, in clinic time."""
@@ -613,6 +666,11 @@ class Service:
         if tool=='book_my_appointment':return self.book(**args)
         if tool=='cancel_my_appointment':return self.change('cancel',args['appointment_id'],token=args.get('confirmation_token'))
         if tool=='reschedule_my_appointment':return self.change('reschedule',args['appointment_id'],args['start'],args.get('confirmation_token'))
+        if tool=='get_my_details':
+            name=self.patients.get(self.identity.subject).get('name')
+            return {'name':name if isinstance(name,str) and name else None}
+        if tool=='set_my_name':
+            name=clean_name(args['name']);self.patients.set_name(self.identity.subject,name);return {'saved':True,'name':name}
         if tool in ('get_clinic_information','doctor_get_clinic_settings'):
             public=('clinic_name','timezone','working_days','opening','closing','breaks','duration_minutes','buffer_minutes','address','contact','confirmation_policy','cancellation_policy','booking_mode','booking_window_days','cancel_cutoff_hours')
             if tool=='doctor_get_clinic_settings':public+=('daily_caps','day_caps','queue_minutes','weekly_booking_limit','no_show_limit','daily_lookup_limit')
@@ -620,15 +678,20 @@ class Service:
         if tool=='doctor_book_appointment':
             from mock import MockCalendar
             if not (isinstance(self.cal,MockCalendar) or self.synthetic_directory):raise Denied('Trusted live patient directory not configured')
-            patient=Service(Identity(args['patient_reference'],'patient',self.identity.clinic,'synthetic',True),self.cal,self.sheets,self.config,approver=self.approver)
-            patient.pending=self.pending;patient.booked_by_clinic=True;patient.alerts=self.alerts
+            # Any patient the clinic knows: a demo patient, one who has used the Patient
+            # Assistant, or one already on the calendar.
+            ref=args['patient_reference']
+            if not (self.patients.known(ref) or (valid_patient(ref) and self.cal.owned_events(self.identity.clinic,ref))):
+                raise ValueError('Unknown patient; use a patient_reference from the schedule')
+            patient=Service(Identity(ref,'patient',self.identity.clinic,'synthetic',True),self.cal,self.sheets,self.config,approver=self.approver)
+            patient.pending=self.pending;patient.booked_by_clinic=True;patient.alerts=self.alerts;patient.patients=self.patients
             return patient.book(args['start'],args['request_id'],args.get('confirmation_token'),args.get('category'),args.get('allow_over_cap') is True)
         if tool=='doctor_get_schedule':
             day=date.fromisoformat(args['day']);z=ZoneInfo(self.config['timezone']);a=datetime.combine(day,time(),z)
-            result={'appointments':[doctor_event(e) for e in self.cal.schedule(a,a+timedelta(days=1))]}
+            result={'appointments':[self.doctor_view(e) for e in self.cal.schedule(a,a+timedelta(days=1))]}
             if self.count_mode():result['places']=self.places(day)
             return result
-        if tool=='doctor_get_appointment':return doctor_event(self.managed(args['appointment_id']))
+        if tool=='doctor_get_appointment':return self.doctor_view(self.managed(args['appointment_id']))
         if tool=='doctor_configure_clinic':
             patch=args['changes']
             if set(patch)-set(DEFAULT) or set(patch)&SETUP_ONLY:raise ValueError('Unknown or immutable field')
@@ -651,7 +714,7 @@ class Service:
             a,b=stamp(args['start']),stamp(args['end'])
             if b<=a or b-a>timedelta(days=7):raise ValueError('Invalid block range')
             conflicts=self.cal.schedule(a,b)
-            payload={'start':a.isoformat(),'end':b.isoformat(),'conflicts':[doctor_event(e) for e in conflicts]}
+            payload={'start':a.isoformat(),'end':b.isoformat(),'conflicts':[self.doctor_view(e) for e in conflicts]}
             needed=self.confirm('block',payload,args.get('confirmation_token'))
             if needed:return needed
             ident=hashlib.sha256(f'block:{self.identity.clinic}:{a.isoformat()}:{b.isoformat()}'.encode()).hexdigest()
@@ -719,7 +782,9 @@ ARGUMENTS={
  'book_my_appointment':schema({'start':{'type':'string','description':'Slot mode: the exact slot start with offset. Count mode: the day, YYYY-MM-DD.'},'request_id':'string','confirmation_token':'string','category':{'type':'string','enum':list(CATEGORIES),'description':'Count mode only. Omit first; ask only if the result has category_required.'}},['start','request_id']),
  'cancel_my_appointment':schema({'appointment_id':'string','confirmation_token':'string'},['appointment_id']),
  'reschedule_my_appointment':schema({'appointment_id':'string','start':'string','confirmation_token':'string'},['appointment_id','start']),
- 'doctor_book_appointment':schema({'patient_reference':{'type':'string','enum':['patient-a','patient-b']},'start':'string','request_id':'string','confirmation_token':'string','category':{'type':'string','enum':list(CATEGORIES)},'allow_over_cap':{'type':'boolean','description':'Count mode: book even though the day is full. Only after the doctor explicitly agrees.'}},['patient_reference','start','request_id']),
+ 'get_my_details':schema(),
+ 'set_my_name':schema({'name':{'type':'string','description':'The name the patient goes by, 1 to 80 characters.'}},['name']),
+ 'doctor_book_appointment':schema({'patient_reference':{'type':'string','description':'patient_reference from the schedule, or patient-a / patient-b.'},'start':'string','request_id':'string','confirmation_token':'string','category':{'type':'string','enum':list(CATEGORIES)},'allow_over_cap':{'type':'boolean','description':'Count mode: book even though the day is full. Only after the doctor explicitly agrees.'}},['patient_reference','start','request_id']),
  'doctor_get_schedule':schema({'day':'string'},['day']),
  'doctor_get_appointment':schema({'appointment_id':'string'},['appointment_id']),
  'doctor_configure_clinic':schema({'changes':CONFIG_CHANGES,'confirmation_token':'string'},['changes']),

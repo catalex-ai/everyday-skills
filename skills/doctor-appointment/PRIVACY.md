@@ -6,6 +6,10 @@ Only scheduling metadata is needed. Patient responses have appointment ID,
 start/end, status and kind. Clinic contact/address is configurable administrative
 information, not patient contact data.
 
+Each patient's record (the name they give the Patient Assistant) is kept in
+`config/patients.json` on this computer. Only the Doctor Assistant sees names;
+they never go to the calendar or the spreadsheet.
+
 Practice state is local mock adapter storage under `config/practice-state.json`;
 it is not a separate live appointment database. Google Calendar is the intended
 live appointment authority. Sheets is a minimal reporting register, with no

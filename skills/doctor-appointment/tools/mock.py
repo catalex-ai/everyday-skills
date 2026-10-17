@@ -49,3 +49,11 @@ def fixture():
         e={'id':ident,'owner':owner,'clinic':DEFAULT['clinic_id'],'start':(base+timedelta(hours=start)).isoformat(),'end':(base+timedelta(hours=end)).isoformat(),'kind':kind,'status':status}
         events[ident]=e
     return {'config':copy.deepcopy(DEFAULT),'events':events,'records':{},'fail_next':True,'last_sync':'never'}
+
+def free_demo_day(events,ids=('a-demo','b-demo')):
+    """Move demo patients' bookings a week back: they keep their history, and tests
+    can book them on the demo day (patients book one appointment a day)."""
+    from datetime import datetime,timedelta
+    for ident in ids:
+        if ident in events:
+            for k in ('start','end'):events[ident][k]=(datetime.fromisoformat(events[ident][k])-timedelta(days=7)).isoformat()

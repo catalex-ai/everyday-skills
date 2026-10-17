@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import date,timedelta
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from core import *
-from mock import MockCalendar,MockSheets,fixture
+from mock import MockCalendar,MockSheets,fixture,free_demo_day
 
 class CountModeTests(unittest.TestCase):
     def setUp(self):
@@ -19,6 +19,7 @@ class CountModeTests(unittest.TestCase):
         self.a=make('patient-a','patient');self.b=make('patient-b','patient');self.doc=make('synthetic-doctor','doctor')
         self.services=(self.a,self.b,self.doc)
         self.day=self.state['events']['a-demo']['start'][:10]
+        free_demo_day(self.cal.events)
         del self.cal.events['b-demo']  # Patient B has no history: a first-time patient
     def confirm(self,s,tool,args):
         first=s.call(tool,args);self.assertTrue(first.get('confirmation_required'),first)
@@ -44,7 +45,7 @@ class CountModeTests(unittest.TestCase):
         booked=self.confirm(self.b,'book_my_appointment',{'start':self.day,'request_id':'count-b-001','category':'consultation'})
         self.assertTrue(booked['calendar_confirmed'])
         self.assertEqual(booked['appointment']['category'],'consultation');self.assertEqual(booked['appointment']['mode'],'count')
-        self.assertEqual(booked['appointment']['start'][:10],self.day)
+        self.assertEqual(booked['appointment']['day'],self.day);self.assertNotIn('start',booked['appointment'])  # the queue time is the doctor's
         self.assertEqual(self.a.call('get_available_slots',{'day':self.day})['places']['consultation']['open'],1)
     def test_reaching_cap_alerts_doctor_once(self):
         self.confirm(self.a,'book_my_appointment',{'start':self.day,'request_id':'count-a-001','category':'consultation'})
@@ -78,7 +79,8 @@ class CountModeTests(unittest.TestCase):
         self.share_config(saved['configuration'])
         self.assertEqual(saved['configuration']['day_caps'][self.day],{'consultation':3,'follow_up':1})
         self.assertEqual(saved['configuration']['daily_caps'],{'consultation':2,'follow_up':1})
-        self.assertTrue(self.b.call('book_my_appointment',{'start':self.day,'request_id':'count-b-002','category':'consultation'})['confirmation_required'])
+        c=Service(Identity('patient-c','patient','synthetic-clinic','synthetic',True),self.cal,self.sheets,saved['configuration'])
+        self.assertTrue(c.call('book_my_appointment',{'start':self.day,'request_id':'count-c-001','category':'consultation'})['confirmation_required'])
     def test_day_cap_override_merges_with_other_days(self):
         other=(date.fromisoformat(self.day)+timedelta(days=1)).isoformat()
         first=self.confirm(self.doc,'doctor_configure_clinic',{'changes':{'day_caps':{self.day:{'consultation':5}}}})
@@ -103,7 +105,7 @@ class CountModeTests(unittest.TestCase):
         booked=self.confirm(self.a,'book_my_appointment',{'start':self.day,'request_id':'count-a-001'})
         other=next(d for d in (date.fromisoformat(self.day)+timedelta(days=i) for i in range(1,8)) if d.weekday() in DEFAULT['working_days']).isoformat()
         moved=self.confirm(self.a,'reschedule_my_appointment',{'appointment_id':booked['appointment']['id'],'start':other})
-        self.assertEqual(moved['appointment']['start'][:10],other);self.assertEqual(moved['appointment']['id'],booked['appointment']['id'])
+        self.assertEqual(moved['appointment']['day'],other);self.assertEqual(moved['appointment']['id'],booked['appointment']['id'])
     def test_closed_day_refused(self):
         sunday=next(d for d in (date.fromisoformat(self.day)+timedelta(days=i) for i in range(7)) if d.weekday() not in DEFAULT['working_days']).isoformat()
         result=self.b.call('book_my_appointment',{'start':sunday,'request_id':'count-b-001','category':'consultation'})
@@ -143,6 +145,7 @@ class TotalCapTests(unittest.TestCase):
             s.alerts=self.alerts;return s
         self.a=make('patient-a','patient');self.b=make('patient-b','patient');self.doc=make('synthetic-doctor','doctor')
         self.day=self.state['events']['a-demo']['start'][:10]
+        free_demo_day(self.cal.events)
         del self.cal.events['b-demo']
     def confirm(self,s,tool,args):
         first=s.call(tool,args);self.assertTrue(first.get('confirmation_required'),first)
@@ -160,7 +163,8 @@ class TotalCapTests(unittest.TestCase):
         self.assertEqual([(x['category'],x['cap']) for x in self.alerts.pending()],[('total',2)])
         told=self.doc.call('doctor_get_schedule',{'day':self.day})['tell_doctor_first']
         self.assertIn('2 of 2 patient places',told[0])
-        full=self.a.call('book_my_appointment',{'start':self.day,'request_id':'total-a-002'})
+        c=Service(Identity('patient-c','patient','synthetic-clinic','synthetic',True),self.cal,self.sheets,self.a.config)
+        full=c.call('book_my_appointment',{'start':self.day,'request_id':'total-c-001'})
         self.assertTrue(full['full'])
     def test_one_day_total_override(self):
         first=self.doc.call('doctor_configure_clinic',{'changes':{'day_caps':{self.day:{'total':5}}}})
@@ -172,15 +176,85 @@ class TotalCapTests(unittest.TestCase):
         self.assertEqual(combine_caps({'consultation':6,'follow_up':4},{'total':12}),{'total':12})
         self.assertEqual(combine_caps({'consultation':6,'follow_up':4},{'consultation':8}),{'consultation':8,'follow_up':4})
 
+class QueueTests(unittest.TestCase):
+    """Each count-mode place is the next queue_minutes of the day, first come first served."""
+    def setUp(self):
+        self.state=fixture();self.cal=MockCalendar(self.state['events']);self.sheets=MockSheets()
+        self.day=self.state['events']['a-demo']['start'][:10];free_demo_day(self.cal.events)
+        self.config=copy.deepcopy(DEFAULT)|{'booking_mode':'count','daily_caps':{'total':50},'opening':'17:00','closing':'17:20','breaks':[]}
+        self.n=0
+    def patient(self,subject):
+        return Service(Identity(subject,'patient','synthetic-clinic','synthetic',True),self.cal,self.sheets,self.config)
+    def book(self,subject):
+        s=self.patient(subject);self.n+=1;args={'start':self.day,'request_id':f'queue-{self.n:04d}'}
+        first=s.call('book_my_appointment',args)
+        if 'confirmation_token' not in first:return first
+        return s.call('book_my_appointment',args|{'confirmation_token':first['confirmation_token']})
+    def times(self):
+        return sorted((e['start'][11:16],e['end'][11:16]) for e in self.cal.events.values() if e.get('mode')=='count' and e['status']!='cancelled')
+    def test_bookings_take_consecutive_five_minute_places(self):
+        for who in ('patient-a','patient-b','patient-c'):self.book(who)
+        self.assertEqual(self.times(),[('17:00','17:05'),('17:05','17:10'),('17:10','17:15')])
+    def test_cancelled_place_is_not_refilled(self):
+        first=self.book('patient-a');self.book('patient-b')
+        s=self.patient('patient-a');args={'appointment_id':first['appointment']['id']}
+        s.call('cancel_my_appointment',args|{'confirmation_token':s.call('cancel_my_appointment',args)['confirmation_token']})
+        self.book('patient-c')
+        self.assertEqual(self.times(),[('17:05','17:10'),('17:10','17:15')])
+    def test_queue_skips_blocked_time_and_fills_up_at_closing(self):
+        self.cal.events['blocked-demo'].update(start=self.day+'T17:05:00+05:30',end=self.day+'T17:10:00+05:30')
+        for who in ('patient-a','patient-b','patient-c'):self.book(who)
+        self.assertEqual(self.times(),[('17:00','17:05'),('17:10','17:15'),('17:15','17:20')])
+        self.assertTrue(self.book('patient-c')['already_booked_that_day'])
+        self.assertTrue(self.book('patient-d')['full'])
+    def test_patient_sees_the_day_doctor_sees_the_time(self):
+        booked=self.book('patient-a')
+        self.assertEqual(booked['appointment']['day'],self.day);self.assertNotIn('start',booked['appointment'])
+        mine=self.patient('patient-a').call('get_my_appointments',{})['appointments']
+        self.assertTrue(all('start' not in e for e in mine if e.get('mode')=='count'))
+        doc=Service(Identity('synthetic-doctor','doctor','synthetic-clinic','synthetic',True),self.cal,self.sheets,self.config)
+        starts=[e['start'][11:16] for e in doc.call('doctor_get_schedule',{'day':self.day})['appointments'] if e.get('mode')=='count']
+        self.assertEqual(starts,['17:00'])
+    def test_queue_minutes_is_configurable(self):
+        self.config['queue_minutes']=10
+        for who in ('patient-a','patient-b'):self.book(who)
+        self.assertEqual(self.times(),[('17:00','17:10'),('17:10','17:20')])
+
+class OneBookingPerDayTests(unittest.TestCase):
+    """A patient books at most one appointment a day; the doctor may add another."""
+    def setUp(self):
+        self.state=fixture();self.cal=MockCalendar(self.state['events']);self.sheets=MockSheets()
+        self.day=self.state['events']['a-demo']['start'][:10]
+        self.a=Service(Identity('patient-a','patient','synthetic-clinic','synthetic',True),self.cal,self.sheets)
+        self.doc=Service(Identity('synthetic-doctor','doctor','synthetic-clinic','synthetic',True),self.cal,self.sheets)
+    def test_patient_cannot_book_a_second_slot_that_day(self):
+        result=self.a.call('book_my_appointment',{'start':self.day+'T14:00:00+05:30','request_id':'second-0001'})
+        self.assertTrue(result['already_booked_that_day']);self.assertEqual(result['appointment']['id'],'a-demo')
+        self.assertNotIn('confirmation_token',result)
+    def test_patient_cannot_move_another_booking_onto_that_day(self):
+        other=next(d for d in (date.fromisoformat(self.day)+timedelta(days=i) for i in range(1,8)) if d.weekday() in DEFAULT['working_days']).isoformat()
+        args={'start':other+'T14:00:00+05:30','request_id':'second-0002'}
+        booked=self.a.call('book_my_appointment',args|{'confirmation_token':self.a.call('book_my_appointment',args)['confirmation_token']})
+        moved=self.a.call('reschedule_my_appointment',{'appointment_id':booked['appointment']['id'],'start':self.day+'T14:00:00+05:30'})
+        self.assertTrue(moved['already_booked_that_day'])
+    def test_count_mode_patient_cannot_book_twice(self):
+        for s in (self.a,self.doc):s.config=copy.deepcopy(DEFAULT)|{'booking_mode':'count','daily_caps':{'total':10}}
+        result=self.a.call('book_my_appointment',{'start':self.day,'request_id':'second-0003'})
+        self.assertTrue(result['already_booked_that_day'])
+    def test_doctor_may_add_a_second_appointment(self):
+        args={'patient_reference':'patient-a','start':self.day+'T14:00:00+05:30','request_id':'doctor-second-1'}
+        first=self.doc.call('doctor_book_appointment',args)
+        self.assertTrue(first['confirmation_required'])
+
 class CountRuntimeTests(unittest.TestCase):
     def test_practice_runtime_records_and_shows_alert_across_sessions(self):
         from server import PracticeRuntime
         tmp=tempfile.TemporaryDirectory();self.addCleanup(tmp.cleanup)
         path=Path(tmp.name)/'practice-state.json'
         state=fixture();state['config'].update(booking_mode='count',daily_caps={'consultation':1,'follow_up':1})
+        day=state['events']['b-demo']['start'][:10];free_demo_day(state['events'])
         atomic(path,state)
         patient=PracticeRuntime('patient','patient-b',path);doctor=PracticeRuntime('doctor',state_path=path)
-        day=state['events']['b-demo']['start'][:10]
         args={'start':day,'request_id':'runtime-b-01'}
         first=patient.call('book_my_appointment',args)
         patient.call('book_my_appointment',args|{'confirmation_token':first['confirmation_token']})

@@ -3,12 +3,13 @@ import sys,unittest,unittest.mock
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from core import DEFAULT,Service,Identity,clinic_change
-from mock import MockCalendar,MockSheets,fixture
+from mock import MockCalendar,MockSheets,fixture,free_demo_day
 
 class ClinicChangeTests(unittest.TestCase):
     def setUp(self):
         state=fixture();self.cal=MockCalendar(state['events']);self.sheets=MockSheets()
         self.day=state['events']['a-demo']['start'][:10]
+        free_demo_day(self.cal.events,('a-demo',))
         self.patient=Service(Identity('patient-a','patient',DEFAULT['clinic_id'],'synthetic',True),self.cal,self.sheets)
         self.doctor=Service(Identity('synthetic-doctor','doctor',DEFAULT['clinic_id'],'synthetic',True),self.cal,self.sheets)
     def confirmed(self,svc,tool,args):
@@ -83,7 +84,7 @@ class ClinicChangeTests(unittest.TestCase):
         self.assertEqual(listed['requested_start_status'],'not_a_clinic_appointment_time')
         lunch=self.patient.call('get_available_slots',{'day':self.day,'preferred_start':self.day+'T13:20:00+05:30'})
         self.assertEqual(lunch['requested_start_status'],'outside_clinic_hours')
-        taken=self.patient.call('get_available_slots',{'day':self.day,'preferred_start':self.state_start('a-demo')})
+        taken=self.patient.call('get_available_slots',{'day':self.day,'preferred_start':self.day+'T11:00:00+05:30'})  # blocked time
         self.assertEqual(taken['requested_start_status'],'already_booked')
         self.assertIn(self.day+'T14:00:00+05:30',listed['slots']);self.assertIn(self.day+'T14:40:00+05:30',listed['slots'])
         off=self.patient.call('book_my_appointment',{'start':self.day+'T14:15:00+05:30','request_id':'patient-off-grid'})

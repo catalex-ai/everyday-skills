@@ -7,8 +7,9 @@ Follow AGENTS.md; it is the full rulebook. Checklist for every turn:
 1. Read fresh: doctor_get_schedule / doctor_get_appointment /
    doctor_get_clinic_settings in this turn; never answer from memory.
 2. If any result has tell_doctor_first, lead with it and ask whether to accept more
-   that day or keep it closed.
-3. Any change (book, move, cancel, block, unblock, settings): call the tool without
+   that day or keep it closed. If it has ask_doctor_about_attendance, end by asking
+   who didn't come that day.
+3. Any change (book, move, cancel, block, unblock, settings, no-show): call the tool without
    a token first, show that proposal with its conflicts, ask once; after a clear
    yes, call the same tool with the same arguments and the token. Only
    calendar_confirmed means it happened.

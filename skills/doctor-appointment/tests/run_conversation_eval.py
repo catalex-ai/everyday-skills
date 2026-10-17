@@ -300,7 +300,7 @@ DOCTOR_TOOLS = {"doctor_get_schedule", "doctor_get_appointment", "doctor_configu
                 "doctor_unblock_time", "doctor_cancel_appointment", "doctor_reschedule_appointment",
                 "doctor_sync_register", "doctor_sync_status", "doctor_review_issues", "doctor_open_spreadsheet",
                 "doctor_connection_status", "doctor_verify_synthetic_appointment", "doctor_book_appointment",
-                "doctor_get_clinic_settings"}
+                "doctor_get_clinic_settings", "doctor_mark_no_show"}
 
 
 def validate_claude_inventory(actor: str, inventory: dict) -> dict:

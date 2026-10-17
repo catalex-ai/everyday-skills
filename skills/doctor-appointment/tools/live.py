@@ -66,10 +66,16 @@ def describe(action, payload, tz):
         except Exception: return str(value)[:60]
     lines = ['Doctor Assistant wants to change the clinic Google Calendar.', '', 'Action: ' + action.upper()]
     if action == 'book':
-        lines += ['Patient: ' + str(payload.get('owner'))[:60], 'Start: ' + when(payload.get('start')), 'End: ' + when(payload.get('end'))]
+        lines += ['Patient: ' + str(payload.get('owner'))[:60]]
+        # A number-per-day place is booked for a day; its queue time is set at the write.
+        lines += ['Day: ' + str(payload['day'])[:10]] if payload.get('day') else ['Start: ' + when(payload.get('start')), 'End: ' + when(payload.get('end'))]
     elif action in ('cancel', 'reschedule'):
         lines += ['Appointment: ' + str(payload.get('appointment_id'))[:12] + '…']
         if payload.get('start'): lines += ['New start: ' + when(payload['start'])]
+        if payload.get('day'): lines += ['New day: ' + str(payload['day'])[:10]]
+    elif action == 'mark_no_show':
+        lines += ['Patient: ' + str(payload.get('owner'))[:60], 'Appointment: ' + when(payload.get('start')),
+                  'Mark as: ' + ('missed (no-show)' if payload.get('no_show') else 'not missed')]
     elif action in ('block', 'unblock'):
         lines += ['From: ' + when(payload.get('start')), 'To: ' + when(payload.get('end'))]
         if payload.get('conflicts'): lines += ['Overlapping appointments: ' + str(len(payload['conflicts']))]
@@ -114,9 +120,10 @@ class LiveRuntime:
         identity = Identity(patient if role == 'patient' else 'synthetic-doctor', role, c['clinic_id'], 'synthetic', True)
         self.service = Service(identity, calendar, sheets, c, config_path=CONFIG,
                                approver=approver or macos_approver(lambda: self.service.config['timezone']), synthetic_directory=True)
-        from core import NoticeLog, AlertLog
+        from core import NoticeLog, AlertLog, LookupLog
         self.service.notices_seen = NoticeLog(ROOT/'config'/'notices-seen.json')
         self.service.alerts = AlertLog(ROOT/'config'/'doctor-alerts.json')
+        self.service.lookups = LookupLog(ROOT/'config'/'lookups.json')
     def tools(self):
         from core import PATIENT, DOCTOR
         return sorted(PATIENT if self.role == 'patient' else DOCTOR)

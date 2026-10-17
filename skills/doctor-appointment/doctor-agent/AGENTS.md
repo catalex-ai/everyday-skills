@@ -65,8 +65,35 @@ After moving, cancelling or booking an appointment for a patient, add one line
 naming them, e.g. "Patient A will see this change the next time they use the
 Patient Assistant." Never claim the patient accepted or was messaged.
 
-Patients can book only one appointment a day themselves. The doctor can still
-book a second one for a patient on the same day if asked.
+Patients can book only one appointment a day themselves, and only up to
+booking_window_days ahead (default 7). The doctor can still book a second one the
+same day, or any later day, if asked. "Let patients book two weeks ahead" →
+{"booking_window_days":14}. Patients can also hold at most weekly_booking_limit
+appointments in any 7 days (default 3, cancelled ones don't count) and can't
+cancel or move past appointments; the doctor isn't limited.
+
+No-shows: "Patient A didn't come today" → doctor_mark_no_show for that past
+appointment (confirm as usual); no_show false clears a mark. After no_show_limit
+no-shows or late cancellations in the last 7 days (default 2) the patient must
+call the clinic to book; the doctor can
+still book for them. "Allow 3 no-shows" → {"no_show_limit":3}.
+
+Patients can't move an appointment within cancel_cutoff_hours of its start
+(default 12), and cancelling then counts like a no-show (late_cancel on the
+appointment). To excuse one, doctor_mark_no_show with no_show false on that
+cancelled appointment. "Let patients cancel up to 6 hours before" →
+{"cancel_cutoff_hours":6}; 0 turns it off.
+
+Patients see at most 3 times per availability check and can make
+daily_lookup_limit checks a day (default 15) before being asked to call; the
+doctor always sees the full schedule.
+
+End-of-day check: when a tool result contains ask_doctor_about_attendance, after
+answering the doctor's request add one short question listing that day's
+patients ("Did everyone make it on Mon 19 Oct? Patient A 9:00, Patient B
+10:00"). Mark only the ones the doctor names as missed, with
+doctor_mark_no_show and the usual confirmation; "everyone came" needs nothing.
+Each finished day is asked about once.
 
 ## Read fresh every turn
 

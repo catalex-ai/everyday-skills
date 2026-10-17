@@ -47,7 +47,7 @@ DOCTOR = {'doctor_get_schedule','doctor_get_appointment','doctor_configure_clini
           'doctor_block_time','doctor_unblock_time','doctor_cancel_appointment',
           'doctor_reschedule_appointment','doctor_sync_register','doctor_sync_status',
           'doctor_review_issues','doctor_open_spreadsheet','doctor_connection_status','doctor_verify_synthetic_appointment','doctor_book_appointment',
-          'doctor_get_clinic_settings'}
+          'doctor_get_clinic_settings','doctor_mark_no_show'}
 
 DEFAULT = dict(clinic_id='synthetic-clinic', clinic_name='Practice Clinic', timezone='Asia/Kolkata',
     working_days=[0,1,2,3,4,5], opening='09:00', closing='17:00', breaks=[['13:00','14:00']],
@@ -58,10 +58,23 @@ DEFAULT = dict(clinic_id='synthetic-clinic', clinic_name='Practice Clinic', time
     # patients a day takes, either in total or split into consultations and
     # follow-ups; patients book a place that day. Each place is the next
     # queue_minutes in the day's queue, so the doctor's calendar never overlaps.
-    booking_mode='slots', daily_caps={'consultation':10,'follow_up':5}, day_caps={}, queue_minutes=5)
+    booking_mode='slots', daily_caps={'consultation':10,'follow_up':5}, day_caps={}, queue_minutes=5,
+    # Patients book at most this many days ahead; the doctor can book any day.
+    booking_window_days=7,
+    # Guards against one patient holding many places: live (not cancelled)
+    # bookings in any 7 days, and no-shows (or late cancellations) in the last
+    # 7 days before they must call the clinic.
+    weekly_booking_limit=3, no_show_limit=2,
+    # Inside this many hours before an appointment a patient can't move it, and
+    # cancelling counts like a no-show (the place is freed for someone else).
+    cancel_cutoff_hours=12,
+    # Availability checks a patient can make per clinic day, so nobody maps out
+    # how busy the doctor is; each check shows at most PATIENT_SLOTS times.
+    daily_lookup_limit=15)
+PATIENT_SLOTS=3
 CATEGORIES=('consultation','follow_up')
 TOTAL='total'  # one shared cap for every kind of visit
-COUNT_FIELDS=('booking_mode','daily_caps','day_caps','queue_minutes')
+COUNT_FIELDS=('booking_mode','daily_caps','day_caps','queue_minutes','booking_window_days','weekly_booking_limit','no_show_limit','cancel_cutoff_hours','daily_lookup_limit')  # added after first release
 
 def valid_caps(caps,partial=False):
     if not isinstance(caps,dict) or set(caps)-{TOTAL,*CATEGORIES}:raise ValueError('Caps need a total, or consultation and follow_up counts')
@@ -80,6 +93,11 @@ def validate_config(c):
     if set(c) != set(DEFAULT): raise ValueError('Unknown or missing configuration fields')
     if c['booking_mode'] not in ('slots','count'): raise ValueError('Booking mode must be slots or count')
     valid_caps(c['daily_caps'])
+    if type(c['booking_window_days']) is not int or not 1<=c['booking_window_days']<=365: raise ValueError('Booking window must be a whole number of days from 1 to 365')
+    for k in ('weekly_booking_limit','no_show_limit'):
+        if type(c[k]) is not int or not 1<=c[k]<=50: raise ValueError('Booking limits must be whole numbers from 1 to 50')
+    if type(c['daily_lookup_limit']) is not int or not 1<=c['daily_lookup_limit']<=500: raise ValueError('Daily lookup limit must be 1 to 500')
+    if type(c['cancel_cutoff_hours']) is not int or not 0<=c['cancel_cutoff_hours']<=168: raise ValueError('Cancellation cutoff must be 0 to 168 hours')
     if type(c['queue_minutes']) is not int or not 1<=c['queue_minutes']<=60: raise ValueError('Queue minutes must be a whole number from 1 to 60')
     if not isinstance(c['day_caps'],dict): raise ValueError('Invalid day caps')
     for d,caps in c['day_caps'].items():
@@ -102,7 +120,7 @@ def validate_config(c):
 
 def public_event(e):
     # No raw event summary/description/contact data reaches an agent.
-    return {k:copy.deepcopy(e[k]) for k in ('id','start','end','status','kind','mode','category') if k in e}
+    return {k:copy.deepcopy(e[k]) for k in ('id','start','end','status','kind','mode','category','late_cancel') if k in e}
 
 # What the patient last agreed to, kept on the event so any change made by the
 # clinic (doctor assistant, or editing/deleting directly in Google Calendar) shows
@@ -139,6 +157,18 @@ class NoticeLog:
             try:data=json.loads(self.path.read_text())
             except (OSError,ValueError):data={}
             data[patient]=sorted(set(data.get(patient,[]))|set(keys))[-500:];atomic(self.path,data)
+
+class LookupLog:
+    """Availability checks per patient per clinic day, in a local file."""
+    def __init__(self,path):self.path=Path(path)
+    def take(self,patient,day,limit):
+        """Count one check; False once the patient has used the day's limit."""
+        with lock(self.path.with_suffix('.lock')):
+            try:data=json.loads(self.path.read_text())
+            except (OSError,ValueError):data={}
+            counts={k:v for k,v in data.get(patient,{}).items() if k>=day}  # earlier days drop off
+            if counts.get(day,0)>=limit:return False
+            counts[day]=counts.get(day,0)+1;data[patient]=counts;atomic(self.path,data);return True
 
 class AlertLog:
     """Doctor alerts (a day's cap reached), kept in a local file. Each record is
@@ -193,6 +223,7 @@ class Service:
         self.booked_by_clinic = False
         self.notices_seen = None  # NoticeLog in running sessions: each clinic change is told once
         self.alerts = None  # AlertLog in running sessions: a reached cap is told to the doctor once
+        self.lookups = None  # LookupLog in running sessions: patients' daily availability checks
     def authorize(self, tool):
         i = self.identity
         if not i.verified or i.clinic != self.config['clinic_id'] or i.source not in ('synthetic','gateway'): raise Denied('Verified identity required')
@@ -263,6 +294,28 @@ class Service:
             if a>=now and self.valid_hours(a,a+length) and not any(x<a+length and y>a for x,y in busy):return a,a+length
             a+=length
         return None
+    def last_bookable_day(self):
+        """Patients book up to booking_window_days ahead; None means no limit (the doctor)."""
+        if self.identity.role!='patient' or self.booked_by_clinic:return None
+        return datetime.now(ZoneInfo(self.config['timezone'])).date()+timedelta(days=self.config['booking_window_days'])
+    def beyond_window(self,d):
+        last=self.last_bookable_day()
+        if last is None or d<=last:return None
+        n=self.config['booking_window_days']
+        return {'conflict':True,'beyond_booking_window':True,'last_bookable_day':last.isoformat(),
+                'reason':f'Patients can book up to {n} days ahead; offer a day up to {last.isoformat()} or ask them to check back later.'}
+    def patient_limits(self,owner,d,exclude=None):
+        """Conflict when a patient booking for themselves has too many no-shows or
+        would hold more than weekly_booking_limit live bookings in any 7 days."""
+        if self.booked_by_clinic:return None
+        mine=[e for e in self.cal.owned_events(self.identity.clinic,owner) if e.get('kind')=='appointment' and 'start' in e and e['id']!=exclude]
+        recent=datetime.now(ZoneInfo('UTC'))-timedelta(days=7)  # missed or late-cancelled in the last 7 days
+        if sum((e['status']=='no_show' or (e['status']=='cancelled' and bool(e.get('late_cancel')))) and stamp(e['start'])>=recent for e in mine)>=self.config['no_show_limit']:
+            return {'conflict':True,'booking_blocked':True,'reason':'Missed appointments: this patient must call the clinic to book.','contact':self.config['contact']}
+        days=[self.parse_day(e['start']) for e in mine if e['status']!='cancelled'];n=self.config['weekly_booking_limit']
+        if any(sum(s<=x<=s+timedelta(days=6) for x in days)>=n for s in (d-timedelta(days=i) for i in range(7))):
+            return {'conflict':True,'weekly_limit_reached':True,'limit':n,'reason':f'Patients can hold {n} appointments in any 7 days; offer a later day or moving an existing one.'}
+        return None
     def already_booked(self,e):
         return {'conflict':True,'already_booked_that_day':True,'reason':'This patient already has an appointment that day; offer to move it instead.',
                 'appointment':patient_event(e,self.config['timezone'])}
@@ -288,9 +341,10 @@ class Service:
             booked=len(self.day_bookings(d,None if key==TOTAL else key,exclude));out[key]={'cap':cap,'booked':booked,'open':max(0,cap-booked)}
         return out
     def open_days(self,category,after,limit=5):
-        days,d=[],after
+        days,d=[],after;last=self.last_bookable_day()
         for _ in range(21):
             d+=timedelta(days=1)
+            if last and d>last:break
             if self.day_open(d) and self.places(d)[self.pool(d,category)]['open']>0:days.append(d.isoformat())
             if len(days)>=limit:break
         return days
@@ -306,8 +360,11 @@ class Service:
             if existing.get('owner')!=self.identity.subject or self.parse_day(existing['start'])!=d: raise Conflict('Request ID reused for different appointment')
             return {'calendar_confirmed':True,'appointment':view(existing)}
         if not self.day_open(d):return {'conflict':True,'closed':True,'reason':'The clinic is not taking bookings that day.','alternatives':self.open_days(category or 'consultation',d)}
+        if self.beyond_window(d):return self.beyond_window(d)
         same_day=None if self.booked_by_clinic else self.booking_that_day(self.identity.subject,d)
         if same_day:return self.already_booked(same_day)
+        limited=self.patient_limits(self.identity.subject,d)
+        if limited:return limited
         if category is None:
             history=[e for e in self.cal.owned_events(self.identity.clinic,self.identity.subject) if e['kind']=='appointment' and e['status']!='cancelled']
             if history:category='follow_up'
@@ -334,13 +391,24 @@ class Service:
         return {'calendar_confirmed':True,'appointment':view(found),'sheets_status':'pending'}
     def slots(self, day, preferred_start=None):
         d=date.fromisoformat(day); z=ZoneInfo(self.config['timezone']); c=self.config
+        if self.beyond_window(d):return {'day':day,'timezone':c['timezone']}|self.beyond_window(d)
         if self.count_mode():
-            result={'mode':'count','day':day,'timezone':c['timezone'],'places':self.places(d)}
+            places=self.places(d)
+            if self.identity.role=='patient' and not self.booked_by_clinic:  # patients learn only whether there's room
+                places={k:{'has_room':v['open']>0} for k,v in places.items()}
+            result={'mode':'count','day':day,'timezone':c['timezone'],'places':places}
             if not self.day_open(d):result['closed']=True
             return result
         length=timedelta(minutes=c['duration_minutes'])
         slots=[a.isoformat() for a in self.grid(d) if a>datetime.now(z) and self.available(a,a+length)]
-        result={'slots':slots,'timezone':c['timezone']}
+        if self.identity.role=='patient' and not self.booked_by_clinic:
+            # Patients see a few times, nearest the one they asked for (or the
+            # earliest), never the whole day, so the schedule can't be read off.
+            near=stamp(preferred_start) if preferred_start else None
+            shown=sorted(slots,key=lambda s:abs((stamp(s)-near).total_seconds())) if near else slots
+            shown=sorted(shown[:PATIENT_SLOTS])
+        else:shown=slots
+        result={'slots':shown,'timezone':c['timezone']}
         if preferred_start:
             preferred=stamp(preferred_start).astimezone(z)
             if preferred.date()!=d:raise ValueError('Requested start must match day in clinic timezone')
@@ -352,6 +420,8 @@ class Service:
             elif not self.on_grid(preferred):status='not_a_clinic_appointment_time'
             elif preferred<=datetime.now(z):status='in_the_past'
             else:status='already_booked'
+            # A patient learns only that a time isn't available, not that someone holds it.
+            if status=='already_booked' and self.identity.role=='patient' and not self.booked_by_clinic:status='not_available'
             result['requested_start_status']=status
         return result
     def book(self,start,request_id,confirmation_token=None,category=None,allow_over_cap=False):
@@ -363,16 +433,19 @@ class Service:
         if existing:
             if existing.get('owner')!=self.identity.subject or existing.get('start')!=a.isoformat(): raise Conflict('Request ID reused for different appointment')
             return {'calendar_confirmed':True,'appointment':public_event(existing)}
+        if self.beyond_window(a.date()):return self.beyond_window(a.date())
         same_day=None if self.booked_by_clinic else self.booking_that_day(self.identity.subject,a.date())
         if same_day:return self.already_booked(same_day)
-        if not self.booked_by_clinic and not self.on_grid(a): return {'conflict':True,'requested_start_status':'not_a_clinic_appointment_time','reason':'Not one of the clinic\'s appointment times (the time itself is free or unknown, not booked); offer one of the alternatives.','alternatives':self.slots(a.date().isoformat())}
-        if not self.available(a,b): return {'conflict':True,'alternatives':self.slots(a.date().isoformat())}
+        limited=self.patient_limits(self.identity.subject,a.date())
+        if limited:return limited
+        if not self.booked_by_clinic and not self.on_grid(a): return {'conflict':True,'requested_start_status':'not_a_clinic_appointment_time','reason':'Not one of the clinic\'s appointment times (the time itself is free or unknown, not booked); offer one of the alternatives.','alternatives':self.slots(a.date().isoformat(),a.isoformat())}
+        if not self.available(a,b): return {'conflict':True,'alternatives':self.slots(a.date().isoformat(),a.isoformat())}
         draft={'id':ident,'start':a.isoformat(),'end':b.isoformat(),'status':'confirmed','kind':'appointment','owner':self.identity.subject,'clinic':self.identity.clinic}
         draft['agreed']=NOT_AGREED if self.booked_by_clinic else agreed_state(draft)
         needed=self.confirm('book',draft,confirmation_token)
         if needed:return needed
         # Recheck immediately before the write; local lock cannot prevent external writers.
-        if not self.available(a,b): return {'conflict':True,'alternatives':self.slots(a.date().isoformat())}
+        if not self.available(a,b): return {'conflict':True,'alternatives':self.slots(a.date().isoformat(),a.isoformat())}
         try:self.cal.insert(draft)
         except (TimeoutError,Uncertain):
             found=self.cal.get(ident)
@@ -385,8 +458,18 @@ class Service:
         e=self.managed(ident) if doctor else self.owned(ident)
         if action=='cancel' and e['status']=='cancelled':return {'calendar_confirmed':True,'appointment':public_event(e)}
         if action=='reschedule' and e['status']=='cancelled':raise Denied('Cancelled appointments cannot be rescheduled')
+        late=False
+        if not doctor:
+            left=stamp(e['start'])-datetime.now(ZoneInfo('UTC'))
+            if left<=timedelta(0):return {'conflict':True,'in_the_past':True,'reason':'This appointment has already started or passed; it can no longer be cancelled or moved.'}
+            late=left<timedelta(hours=self.config['cancel_cutoff_hours'])
+            if late and action=='reschedule':
+                return {'conflict':True,'too_late_to_move':True,'cutoff_hours':self.config['cancel_cutoff_hours'],
+                        'reason':f"Appointments can't be moved within {self.config['cancel_cutoff_hours']} hours of the start; the patient can keep it or cancel (a late cancellation counts like a missed appointment)."}
         payload={'appointment_id':ident,'version':e.get('etag',json.dumps(e,sort_keys=True))}
+        if late:payload['late_cancellation']=True  # shown in the proposal: counts like a missed appointment
         day=None
+        if start and not doctor and self.beyond_window(self.parse_day(start)):return self.beyond_window(self.parse_day(start))
         if start and e.get('mode')=='count':
             day=self.parse_day(start);payload['day']=day.isoformat()
             if not self.day_open(day):return {'conflict':True,'closed':True,'alternatives':self.open_days(e['category'],day)}
@@ -394,11 +477,13 @@ class Service:
             if self.places(day,exclude=ident)[self.pool(day,e['category'])]['open']<=0 or self.queue_slot(day,exclude=ident) is None:return full()
         elif start:
             a,b=self.interval(start);payload['start']=a.isoformat()
-            if not doctor and not self.on_grid(a):return {'conflict':True,'requested_start_status':'not_a_clinic_appointment_time','reason':'Not one of the clinic\'s appointment times (the time itself is free or unknown, not booked); offer one of the alternatives.','alternatives':self.slots(a.date().isoformat())}
-            if not self.available(a,b,ident):return {'conflict':True,'alternatives':self.slots(a.date().isoformat())}
+            if not doctor and not self.on_grid(a):return {'conflict':True,'requested_start_status':'not_a_clinic_appointment_time','reason':'Not one of the clinic\'s appointment times (the time itself is free or unknown, not booked); offer one of the alternatives.','alternatives':self.slots(a.date().isoformat(),a.isoformat())}
+            if not self.available(a,b,ident):return {'conflict':True,'alternatives':self.slots(a.date().isoformat(),a.isoformat())}
         if start and not doctor:
             same_day=self.booking_that_day(e['owner'],day or a.date(),exclude=ident)
             if same_day:return self.already_booked(same_day)
+            limited=self.patient_limits(e['owner'],day or a.date(),exclude=ident)
+            if limited and not limited.get('booking_blocked'):return limited  # moving is fine after no-shows
         needed=self.confirm(action,payload,token)
         if needed:return needed
         if day:  # the queue place on the new day is taken at the write
@@ -406,7 +491,7 @@ class Service:
             if slot is None:return full()
             a,b=slot
         updated=copy.deepcopy(e)
-        if action=='cancel':updated['status']='cancelled'
+        if action=='cancel':updated['status']='cancelled';updated.update({'late_cancel':True} if late else {})
         else:updated.update(start=a.isoformat(),end=b.isoformat())
         if not doctor:updated['agreed']=agreed_state(updated)  # the patient made this change
         elif 'agreed' not in e and e.get('kind')=='appointment':updated['agreed']=agreed_state(e)  # booked before tracking
@@ -417,6 +502,32 @@ class Service:
         if not found or any(found.get(k)!=updated.get(k) for k in (('status',) if action=='cancel' else ('start','end','status'))): raise Uncertain('Change unverified; retry after reviewing Calendar')
         if day:self.alert_if_full(day,e['category'])
         return {'calendar_confirmed':True,'appointment':public_event(found) if doctor else patient_event(found,self.config['timezone'])}
+    def mark_no_show(self,ident,no_show=True,token=None):
+        """Doctor marks a past appointment as missed (or clears it). Enough no-shows
+        stop a patient booking for themselves until the doctor clears one."""
+        e=self.managed(ident)
+        if e['status']=='cancelled':
+            # A late cancellation counts like a no-show; the doctor may excuse it.
+            if no_show or not e.get('late_cancel'):return {'conflict':True,'reason':'Cancelled appointments cannot be marked; only a late cancellation can be excused (no_show false).'}
+            needed=self.confirm('mark_no_show',{'appointment_id':ident,'no_show':False,'start':e['start'],'owner':e.get('owner'),'version':e.get('etag',json.dumps(e,sort_keys=True))},token)
+            if needed:return needed
+            updated=copy.deepcopy(e);updated['late_cancel']=False
+            try:self.cal.update(updated,e.get('etag'))
+            except (TimeoutError,Uncertain):pass
+            found=self.cal.get(ident)
+            if not found or found.get('late_cancel'):raise Uncertain('Change unverified; retry after reviewing Calendar')
+            return {'calendar_confirmed':True,'appointment':doctor_event(found)}
+        if stamp(e['start'])>datetime.now(ZoneInfo('UTC')):return {'conflict':True,'reason':'Only appointments that have already started can be marked as no-show.'}
+        target='no_show' if no_show else 'confirmed'
+        if e['status']==target:return {'calendar_confirmed':True,'appointment':doctor_event(e)}
+        needed=self.confirm('mark_no_show',{'appointment_id':ident,'no_show':no_show,'start':e['start'],'owner':e.get('owner'),'version':e.get('etag',json.dumps(e,sort_keys=True))},token)
+        if needed:return needed
+        updated=copy.deepcopy(e);updated['status']=target
+        try:self.cal.update(updated,e.get('etag'))
+        except (TimeoutError,Uncertain):pass
+        found=self.cal.get(ident)
+        if not found or found.get('status')!=target:raise Uncertain('Change unverified; retry after reviewing Calendar')
+        return {'calendar_confirmed':True,'appointment':doctor_event(found)}
     def sync(self):
         # Register is reporting state, never read by scheduling operations.
         records=self.sheets.read_records(); seen=set()
@@ -430,6 +541,12 @@ class Service:
             return {'synced':False,'issue':'Sheets write failed; Calendar appointments remain accepted. Reconcile again.'}
         return {'synced':True,'rows':len(records),'issues':[{'id':k,'issue':v['issue']} for k,v in records.items() if v.get('issue')]}
     def call(self,tool,args):
+        if self.identity.role=='patient' and self.lookups is not None and isinstance(args,dict) and (
+                tool=='get_available_slots' or (tool in ('book_my_appointment','reschedule_my_appointment') and 'confirmation_token' not in args)):
+            today=datetime.now(ZoneInfo(self.config['timezone'])).date().isoformat()
+            if not self.lookups.take(self.identity.subject,today,self.config['daily_lookup_limit']):
+                return {'lookup_limit_reached':True,'contact':self.config['contact'],
+                        'reason':'This patient has checked availability many times today; ask them to call the clinic or try again tomorrow.'}
         result=self.handle(tool,args)
         if self.identity.role=='patient' and isinstance(result,dict):
             # Every patient answer carries upcoming clinic changes. The start-up
@@ -451,7 +568,22 @@ class Service:
                 label={'consultation':'consultation','follow_up':'follow-up',TOTAL:'patient'}[a['category']]
                 told.append(f"{d.strftime('%a %d %b')}: {p['booked']} of {p['cap']} {label} places are booked, so patients asking for that day are being turned away. Ask the doctor whether to accept more {label}s that day (and how many) or keep it closed.")
             if told:result={'tell_doctor_first':told}|result
+        if self.identity.role=='doctor' and self.notices_seen is not None and isinstance(result,dict):
+            check=self.attendance_check()
+            if check:result=result|{'ask_doctor_about_attendance':check}
         return result
+    def attendance_check(self):
+        """Once per finished clinic day (last 7 days): the appointments still marked as
+        attended, so the doctor can say who didn't come. Recorded as asked once shown."""
+        z=ZoneInfo(self.config['timezone']);now=datetime.now(z);asked=self.notices_seen.load(self.identity.subject);out=[]
+        for back in range(7,-1,-1):
+            d=now.date()-timedelta(days=back);a,close=self.window(d);key='attendance:'+d.isoformat()
+            if key in asked or d.weekday() not in self.config['working_days'] or now<close:continue
+            seen=[e for e in self.cal.schedule(datetime.combine(d,time(),z),datetime.combine(d,time(),z)+timedelta(days=1))
+                  if e.get('kind')=='appointment' and e['status']=='confirmed' and e.get('owner') and stamp(e['start'])<now]
+            self.notices_seen.add(self.identity.subject,[key])
+            if seen:out.append({'day':d.isoformat(),'appointments':[doctor_event(e) for e in sorted(seen,key=lambda e:e['start'])]})
+        return out
     def notice(self,e):
         """Plain sentence about a clinic-side change, in clinic time."""
         z=ZoneInfo(self.config['timezone'])
@@ -482,8 +614,8 @@ class Service:
         if tool=='cancel_my_appointment':return self.change('cancel',args['appointment_id'],token=args.get('confirmation_token'))
         if tool=='reschedule_my_appointment':return self.change('reschedule',args['appointment_id'],args['start'],args.get('confirmation_token'))
         if tool in ('get_clinic_information','doctor_get_clinic_settings'):
-            public=('clinic_name','timezone','working_days','opening','closing','breaks','duration_minutes','buffer_minutes','address','contact','confirmation_policy','cancellation_policy','booking_mode')
-            if tool=='doctor_get_clinic_settings':public+=('daily_caps','day_caps','queue_minutes')
+            public=('clinic_name','timezone','working_days','opening','closing','breaks','duration_minutes','buffer_minutes','address','contact','confirmation_policy','cancellation_policy','booking_mode','booking_window_days','cancel_cutoff_hours')
+            if tool=='doctor_get_clinic_settings':public+=('daily_caps','day_caps','queue_minutes','weekly_booking_limit','no_show_limit','daily_lookup_limit')
             return copy.deepcopy({k:self.config[k] for k in public})|{'clinic_today':datetime.now(ZoneInfo(self.config['timezone'])).date().isoformat()}
         if tool=='doctor_book_appointment':
             from mock import MockCalendar
@@ -512,6 +644,7 @@ class Service:
             if needed:return needed
             if self.config_path:atomic(self.config_path,c)
             self.config=c;return {'saved':True,'configuration':c}
+        if tool=='doctor_mark_no_show':return self.mark_no_show(args['appointment_id'],args.get('no_show',True) is not False,args.get('confirmation_token'))
         if tool in ('doctor_cancel_appointment','doctor_reschedule_appointment'):
             return self.change('cancel' if tool=='doctor_cancel_appointment' else 'reschedule',args['appointment_id'],args.get('start'),args.get('confirmation_token'),doctor=True)
         if tool=='doctor_block_time':
@@ -565,13 +698,18 @@ SETUP_ONLY={'clinic_id','calendar_id','spreadsheet_id'}
 def schema(properties={},required=()):
     return {'type':'object','properties':{k:({'type':v} if isinstance(v,str) else v) for k,v in properties.items()},'required':list(required),'additionalProperties':False}
 CONFIG_CHANGES=schema({
-    **{k:{'type':'string'} for k in DEFAULT if k not in SETUP_ONLY|{'working_days','breaks','duration_minutes','buffer_minutes','queue_minutes'}},
+    **{k:{'type':'string'} for k in DEFAULT if k not in SETUP_ONLY|{'working_days','breaks','duration_minutes','buffer_minutes','queue_minutes','booking_window_days','weekly_booking_limit','no_show_limit','cancel_cutoff_hours','daily_lookup_limit'}},
     'working_days':{'type':'array','items':{'type':'integer','minimum':0,'maximum':6},'minItems':1,'description':'Monday=0 through Sunday=6.'},
     'breaks':{'type':'array','items':{'type':'array','items':{'type':'string'},'minItems':2,'maxItems':2},'description':'Pairs of local HH:MM start/end times.'},
     'duration_minutes':{'type':'integer','minimum':5,'maximum':240,'description':'Appointment length in minutes.'},
     'buffer_minutes':{'type':'integer','minimum':0,'maximum':240,'description':'Symmetric clearance before AND after each appointment. Five minutes before and after means 5, not 10. Separate before/after settings are unsupported.'},
     'booking_mode':{'type':'string','enum':['slots','count'],'description':'slots: patients pick set start times. count: no times; the doctor caps how many patients each day takes.'},
     'daily_caps':{'type':'object','properties':{c:{'type':'integer','minimum':0,'maximum':500} for c in (TOTAL,*CATEGORIES)},'additionalProperties':False,'description':'Usual places per working day in count mode: {"total":N} for one shared limit, or {"consultation":N,"follow_up":M} for a split.'},
+    'booking_window_days':{'type':'integer','minimum':1,'maximum':365,'description':'How many days ahead patients can book (default 7). The doctor can book any day.'},
+    'weekly_booking_limit':{'type':'integer','minimum':1,'maximum':50,'description':'Most live (not cancelled) appointments a patient can book themselves in any 7 days (default 3).'},
+    'daily_lookup_limit':{'type':'integer','minimum':1,'maximum':500,'description':'Availability checks (and booking or move requests) a patient can make per day before being asked to call (default 15).'},
+    'cancel_cutoff_hours':{'type':'integer','minimum':0,'maximum':168,'description':'Within this many hours of the start patients cannot move an appointment, and cancelling counts like a no-show (default 12; 0 turns it off).'},
+    'no_show_limit':{'type':'integer','minimum':1,'maximum':50,'description':'No-shows or late cancellations in the last 7 days after which a patient must call the clinic to book (default 2).'},
     'queue_minutes':{'type':'integer','minimum':1,'maximum':60,'description':'Count mode: minutes each patient takes in the day\'s queue (default 5).'},
     'day_caps':{'type':'object','additionalProperties':{'type':['object','null'],'properties':{c:{'type':'integer','minimum':0,'maximum':500} for c in (TOTAL,*CATEGORIES)},'additionalProperties':False},'description':'Per-day overrides keyed YYYY-MM-DD, e.g. {"2026-10-20":{"total":15}} or {"2026-10-20":{"consultation":15}}. Only the days given change; null removes a day.'}
 })
@@ -585,6 +723,7 @@ ARGUMENTS={
  'doctor_get_schedule':schema({'day':'string'},['day']),
  'doctor_get_appointment':schema({'appointment_id':'string'},['appointment_id']),
  'doctor_configure_clinic':schema({'changes':CONFIG_CHANGES,'confirmation_token':'string'},['changes']),
+ 'doctor_mark_no_show':schema({'appointment_id':'string','no_show':{'type':'boolean','description':'true marks a missed appointment; false clears the mark.'},'confirmation_token':'string'},['appointment_id']),
  'doctor_block_time':schema({'start':'string','end':'string','confirmation_token':'string'},['start','end']),
  'doctor_unblock_time':schema({'appointment_id':'string','confirmation_token':'string'},['appointment_id']),
  'doctor_cancel_appointment':schema({'appointment_id':'string','confirmation_token':'string'},['appointment_id']),

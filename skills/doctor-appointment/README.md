@@ -1,6 +1,7 @@
 # Doctor Assistant
 
-Two ready-made appointment assistants for a clinic, for **Claude Code** or **Codex**:
+Two ready-made appointment assistants for a clinic, running on **Claude Code**
+with the **Haiku** model only:
 a **Patient Assistant** (book, move or cancel your own appointment) and a
 **Doctor Assistant** (see the day, book for a patient, block time, change hours).
 Bookings are kept either in the clinic's **Google Calendar + Sheets** or on
@@ -17,8 +18,9 @@ and for Google which calendar and spreadsheet) and tells you how to open both
 assistants. You do not run any commands. For a number per day, one number is
 enough ("10 a day"); a new-patient/follow-up split is optional. Choosing Google
 needs a one-time sign-in file (see "Google sign-in file") and one browser
-sign-in. When setup asks "Claude or Codex?", Claude runs both assistants on
-Haiku.
+sign-in. The double-click shortcuts always open Claude Code on Haiku: they pass
+`--model haiku`, ignore any `ANTHROPIC_MODEL` setting, point the Opus and Sonnet
+names at Haiku, and allow only Haiku in `/model`.
 
 Real-patient sign-in is not available yet: the Patient Assistant works with two
 test patients, Patient A and Patient B.
@@ -32,6 +34,17 @@ Both talk like a person at the front desk: short plain messages, a simple
 - Shows free times and the patient's appointments; books, moves and cancels.
 - One appointment a day per patient: asking for a second time that day gets an
   offer to move the existing one instead.
+- Books up to a week ahead (the doctor can change this: "let patients book two
+  weeks ahead"); later days are refused with the latest days that are open.
+- At most 3 appointments in any 7 days (cancelled ones don't count); past
+  appointments can't be cancelled or moved. Within 12 hours of the start an
+  appointment can't be moved, and cancelling counts like a missed appointment.
+  After 2 no-shows or late cancellations within 7 days, the patient is asked to
+  call the clinic to book until a week has passed.
+- Shows at most 3 times per check, nearest the time asked for, and says only
+  "not available" for a taken time; in number-per-day clinics, only whether a
+  day has room. After 15 checks in a day the patient is asked to call, so nobody
+  can map out how busy the doctor is.
 - In number-per-day clinics, talks only in days ("You're booked for Tuesday the
   20th"), never clock times.
 - Explains why a time can't be booked (closed, taken, or not one of the clinic's
@@ -51,7 +64,12 @@ Both talk like a person at the front desk: short plain messages, a simple
 - In number-per-day mode, shows each day's queue in booking order with times
   (5:00, 5:05, …), reports how full the day is, changes the minutes per patient,
   and asks whether to take more patients when a day fills up.
-- Can book a second appointment for a patient on the same day if asked.
+- Can book a second appointment for a patient on the same day, or beyond the
+  patients' booking window or weekly limit, if asked.
+- After each clinic day, the next time the doctor uses it, asks who didn't come
+  and marks those as no-shows; the doctor can also say "Patient A didn't come
+  today" at any time, clear a mark, or excuse a late cancellation. Limits are
+  adjustable ("allow 3 no-shows", "let patients cancel up to 6 hours before").
 - Syncs and reviews the appointment spreadsheet.
 
 Try: Patient: "What's free on Tuesday?", "Book me Tuesday at 10:20", "Move my
@@ -72,6 +90,18 @@ patient 8 minutes", "On Friday I'll take 15", "Sync the register".
    offered other days, and the Doctor Assistant's next reply asks whether to take
    more.
 5. Cancel one booking: the next booking still goes to the end of the queue.
+6. Patient Assistant: ask for a day more than a week away; it should say bookings
+   open a week ahead and offer days inside that week.
+7. Book three days in one week as Patient A; a fourth is refused until one is
+   cancelled.
+8. After an appointment time has passed, tell the Doctor Assistant the patient
+   didn't come; after two such marks, Patient A is asked to call the clinic.
+9. Book Patient A for later today (under 12 hours away), then ask to move it
+   (refused) and to cancel it (warned that it counts like a missed appointment).
+10. Open the Doctor Assistant after a clinic day with bookings has ended: it asks
+    who didn't come.
+11. Patient Assistant: ask "what's free tomorrow?"; it offers a few times, not
+    the whole day.
 
 ### Set times or a number of patients per day
 
@@ -109,15 +139,15 @@ doctor first changes them through the assistant.
 
 ## Open an assistant
 
-Codex: double-click **Patient Assistant.command** or **Doctor Assistant.command**.
-From a terminal (either runtime):
+Double-click **Patient Assistant.command** or **Doctor Assistant.command**, or
+from a terminal:
 
 ```sh
 ./doctor-assistant/start.sh patient
 ./doctor-assistant/start.sh doctor
-./doctor-assistant/start.sh patient claude
-./doctor-assistant/start.sh doctor claude
 ```
+
+Both open Claude Code on Haiku; there is no other model or app option.
 
 The shortcuts only pass the restricted native CLI options below. They do not
 install dependencies, sign in to Google or change policy.
@@ -193,7 +223,10 @@ Setup above does not run any of this. Consumers reuse the published results.
 homes without reading it. Without a login, run `CODEX_HOME="$PWD/.codex" codex
 login` in each role folder. Claude uses its existing login.
 
-## Codex: two native terminals
+## Codex: two native terminals (maintainer audits only)
+
+The shortcuts never open Codex: clinic use is Claude Code on Haiku only. These
+Codex folders remain for maintainer runtime audits.
 
 Terminal 1, from your workspace root:
 
@@ -243,7 +276,7 @@ This explicit local test identity is not authentication for live patients.
 In either role folder, run this native command:
 
 ```sh
-claude --restricted --tools Skill --strict-mcp-config --mcp-config .mcp.json --setting-sources "" --plugin-dir .claude --append-system-prompt-file AGENTS.md --settings .claude/settings.json --permission-mode dontAsk --no-chrome
+env -u ANTHROPIC_MODEL ANTHROPIC_DEFAULT_OPUS_MODEL=claude-haiku-5-5 ANTHROPIC_DEFAULT_SONNET_MODEL=claude-haiku-5-5 ANTHROPIC_DEFAULT_HAIKU_MODEL=claude-haiku-5-5 claude --model haiku --restricted --tools Skill --strict-mcp-config --mcp-config .mcp.json --setting-sources "" --plugin-dir .claude --append-system-prompt-file AGENTS.md --settings .claude/settings.json --permission-mode dontAsk --no-chrome
 ```
 
 Claude receives `AGENTS.md` through its native prompt-file flag and loads the role skill through the explicitly selected local `.claude` plugin. `CLAUDE.md` also imports AGENTS.md for ordinary native discovery. Restricted-mode auto-discovery did not load project instructions/skills on the tested build; explicit native flags are required.

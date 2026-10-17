@@ -115,10 +115,11 @@ take a few minutes. What's your clinic called?"
    - Setup is finished only when `ADMIN status` shows
      `bookings_kept_in: "Google Calendar and Sheets"`. If not, fix it or tell the
      doctor the blocker. Never finish with bookings silently kept elsewhere.
-7. **Assistant app.** Check `claude --version` and `codex --version`. If only
-   one works, use it; if both, ask "Claude or Codex?". Then run
-   `ADMIN native-prepare --runtime claude` (or `codex`, which also reuses the
-   existing Codex login). The double-click shortcuts then open that app.
+7. **Assistant app.** The assistants run only on Claude Code with the Haiku
+   model; don't offer Codex or another model. Check `claude --version`; if it's
+   missing, tell the doctor in one line to install Claude Code and wait. Then run
+   `ADMIN native-prepare --runtime claude`. The double-click shortcuts open Claude
+   Code locked to Haiku.
 8. **Finish** like a person handing over the keys, in a few short lines: it's
    ready; where bookings are kept (calendar and spreadsheet name, or "this
    computer"); how to open them ("double-click Doctor Assistant or Patient

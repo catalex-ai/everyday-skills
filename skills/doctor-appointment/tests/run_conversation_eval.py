@@ -295,7 +295,7 @@ class NativeSession:
                 self.process.wait()
 
 PATIENT_TOOLS = {"get_available_slots", "get_my_appointments", "book_my_appointment", "cancel_my_appointment",
-                 "reschedule_my_appointment", "get_clinic_information"}
+                 "reschedule_my_appointment", "get_clinic_information", "get_my_details", "set_my_name"}
 DOCTOR_TOOLS = {"doctor_get_schedule", "doctor_get_appointment", "doctor_configure_clinic", "doctor_block_time",
                 "doctor_unblock_time", "doctor_cancel_appointment", "doctor_reschedule_appointment",
                 "doctor_sync_register", "doctor_sync_status", "doctor_review_issues", "doctor_open_spreadsheet",

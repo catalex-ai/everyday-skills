@@ -11,7 +11,7 @@ import json, subprocess, sys
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
-from core import ROOT, Service, Identity, validate_config, stamp, lock
+from core import ROOT, Service, Identity, PatientDirectory, validate_config, stamp, lock, valid_patient
 
 CONFIG = ROOT/'config'/'google-clinic.json'
 ACTIVATION = ROOT/'config'/'live-activation.json'
@@ -110,7 +110,7 @@ def google_clients(c):
 class LiveRuntime:
     """Same role/identity surface as PracticeRuntime, backed by Google."""
     def __init__(self, role, patient='patient-a', approver=None):
-        if role not in ('patient', 'doctor') or patient not in ('patient-a', 'patient-b'): raise ValueError('Invalid synthetic identity')
+        if role not in ('patient', 'doctor') or not valid_patient(patient): raise ValueError('Invalid patient identity')
         state = live_state()
         if not state['active']: raise PermissionError('Live Google mode unavailable: ' + state['reason'])
         self.role = role
@@ -124,6 +124,7 @@ class LiveRuntime:
         self.service.notices_seen = NoticeLog(ROOT/'config'/'notices-seen.json')
         self.service.alerts = AlertLog(ROOT/'config'/'doctor-alerts.json')
         self.service.lookups = LookupLog(ROOT/'config'/'lookups.json')
+        self.service.patients = PatientDirectory(ROOT/'config'/'patients.json')
     def tools(self):
         from core import PATIENT, DOCTOR
         return sorted(PATIENT if self.role == 'patient' else DOCTOR)

@@ -21,3 +21,4 @@ evals/RESULTS.md
 evals/dashboard.html
 evals/baseline-agent-snapshot/
 tests/conversations/
+config/patients.*

@@ -8,7 +8,9 @@
       "mcp__clinic__get_available_slots",
       "mcp__clinic__get_clinic_information",
       "mcp__clinic__get_my_appointments",
+      "mcp__clinic__get_my_details",
       "mcp__clinic__reschedule_my_appointment",
+      "mcp__clinic__set_my_name",
       "Skill(clinic-role:appointments)"
     ],
     "deny": [

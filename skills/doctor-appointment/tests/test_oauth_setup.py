@@ -75,6 +75,11 @@ class OAuthSetupTests(unittest.TestCase):
         self.assertEqual((saved['calendar_id'],saved['spreadsheet_id']),('clinic-calendar-id','created-register-id_123'))
         self.assertIn('https://docs.google.com/spreadsheets/d/created-register-id_123/edit',out)
 
+    def test_listing_calendars_keeps_the_sign_in_so_setup_does_not_ask_again(self):
+        with patch.object(sys,'argv',['admin.py','list-calendars','--client',str(self.outside)]),contextlib.redirect_stdout(io.StringIO()):admin.main()
+        self.assertLess(self.events.index(('list-calendars',)),self.events.index(('store',)))
+        self.assertEqual(sum(e[0]=='authorize' for e in self.events),1)
+
     def test_existing_sheet_url_initializes_but_never_creates(self):
         out=self.invoke(['2','https://docs.google.com/spreadsheets/d/existing_sheet-id_123/edit?gid=0','1'],['--client',str(self.outside)])
         self.assertFalse(any(e[0]=='create' for e in self.events))

@@ -5,7 +5,7 @@ from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import live,server
 from core import DEFAULT,Service,Identity,Denied,ARGUMENTS
-from mock import MockCalendar,MockSheets,fixture
+from mock import MockCalendar,MockSheets,fixture,free_demo_day
 
 class LiveGateTests(unittest.TestCase):
     def setUp(self):
@@ -115,12 +115,13 @@ class ApproverTests(unittest.TestCase):
     def svc(self,approver,role='patient',subject='patient-a'):
         return Service(Identity(subject,role,'synthetic-clinic','synthetic',True),self.cal,self.sheets,approver=approver,synthetic_directory=True)
     def test_denied_dialog_blocks_write_and_consumes_token(self):
-        s=self.svc(lambda a,p:False);args={'start':self.day+'T14:00:00+05:30','request_id':'approve-test-1'}
+        s=self.svc(lambda a,p:False,subject='patient-c');args={'start':self.day+'T14:00:00+05:30','request_id':'approve-test-1'}
         d=s.call('book_my_appointment',args)
         with self.assertRaises(Denied):s.call('book_my_appointment',args|{'confirmation_token':d['confirmation_token']})
         self.assertEqual(self.cal.events,self.state['events'])
         with self.assertRaises(Denied):s.call('book_my_appointment',args|{'confirmation_token':d['confirmation_token']})
     def test_non_true_approval_is_denial(self):
+        free_demo_day(self.cal.events,('a-demo',))  # patients book one appointment a day
         s=self.svc(lambda a,p:'yes');args={'start':self.day+'T14:00:00+05:30','request_id':'approve-test-2'}
         d=s.call('book_my_appointment',args)
         with self.assertRaises(Denied):s.call('book_my_appointment',args|{'confirmation_token':d['confirmation_token']})

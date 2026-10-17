@@ -6,7 +6,7 @@ from datetime import datetime,timedelta
 from zoneinfo import ZoneInfo
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from core import *
-from mock import MockCalendar,MockSheets,fixture
+from mock import MockCalendar,MockSheets,fixture,free_demo_day
 from server import PracticeRuntime
 from audit import inventory
 
@@ -92,35 +92,43 @@ class ClinicTests(unittest.TestCase):
         self.cal.schedule=forbid;self.cal.managed_events=forbid
         self.a.call('get_my_appointments',{})
     def test_confirmation_required(self):
+        free_demo_day(self.cal.events,('a-demo',))  # patients book one appointment a day
         args={'start':self.slot,'request_id':'request-0001'}
         self.a.call('book_my_appointment',args)
         self.assertEqual(len(self.cal.events),4)
         with self.assertRaises(Denied):self.a.call('book_my_appointment',args|{'confirmation_token':'fake'})
     def test_confirmation_bound_to_payload(self):
+        free_demo_day(self.cal.events,('a-demo',))  # patients book one appointment a day
         r=self.a.call('book_my_appointment',{'start':self.slot,'request_id':'request-0001'})
         with self.assertRaises(Denied):self.a.call('book_my_appointment',{'start':self.day+'T16:00:00+05:30','request_id':'request-0002','confirmation_token':r['confirmation_token']})
     def test_book_and_duplicate(self):
+        free_demo_day(self.cal.events,('a-demo',))  # patients book one appointment a day
         args={'start':self.slot,'request_id':'request-0001'}
         r=self.confirm(self.a,'book_my_appointment',args);again=self.a.call('book_my_appointment',args)
         self.assertTrue(r['calendar_confirmed']);self.assertEqual(r['appointment'],again['appointment']);self.assertEqual(len(self.cal.events),5)
     def test_reused_id_changed_slot(self):
+        free_demo_day(self.cal.events,('a-demo',))  # patients book one appointment a day
         self.confirm(self.a,'book_my_appointment',{'start':self.slot,'request_id':'request-0001'})
         with self.assertRaises(Conflict):self.a.call('book_my_appointment',{'start':self.day+'T16:00:00+05:30','request_id':'request-0001'})
     def test_initial_conflict(self):
         r=self.a.call('book_my_appointment',{'start':self.cal.events['b-demo']['start'],'request_id':'request-0001'});self.assertTrue(r['conflict'])
     def test_recheck_before_write(self):
+        free_demo_day(self.cal.events,('a-demo',))  # patients book one appointment a day
         args={'start':self.slot,'request_id':'request-0001'};r=self.a.call('book_my_appointment',args)
         self.cal.events['race']={'id':'race','start':self.slot,'end':self.day+'T14:30:00+05:30','status':'confirmed','kind':'external'}
         result=self.a.call('book_my_appointment',args|{'confirmation_token':r['confirmation_token']});self.assertTrue(result['conflict']);self.assertEqual(len(self.cal.events),5)
     def test_external_race_reported(self):
+        free_demo_day(self.cal.events,('a-demo',))  # patients book one appointment a day
         def race(cal,e):cal.events['external']=e|{'id':'external','owner':'patient-b'}
         self.cal.before_insert=race
         r=self.confirm(self.a,'book_my_appointment',{'start':self.slot,'request_id':'request-0001'})
         self.assertTrue(r['external_conflict_detected'])
     def test_ambiguous_timeout_recovery(self):
+        free_demo_day(self.cal.events,('a-demo',))  # patients book one appointment a day
         self.cal.timeout_insert=True
         r=self.confirm(self.a,'book_my_appointment',{'start':self.slot,'request_id':'request-0001'});self.assertTrue(r['calendar_confirmed']);self.assertEqual(len(self.cal.events),5)
     def test_unknown_timeout_never_confirmed(self):
+        free_demo_day(self.cal.events,('a-demo',))  # patients book one appointment a day
         def fail(e):raise TimeoutError()
         self.cal.insert=fail
         with self.assertRaises(Uncertain):self.confirm(self.a,'book_my_appointment',{'start':self.slot,'request_id':'request-0001'})
@@ -137,6 +145,7 @@ class ClinicTests(unittest.TestCase):
     def test_timezone_requires_offset(self):
         with self.assertRaises(ValueError):self.a.call('book_my_appointment',{'start':self.day+'T14:00:00','request_id':'request-0001'})
     def test_equivalent_timezone(self):
+        free_demo_day(self.cal.events,('a-demo',))  # patients book one appointment a day
         r=self.confirm(self.a,'book_my_appointment',{'start':self.day+'T08:30:00+00:00','request_id':'request-0001'});self.assertEqual(r['appointment']['start'],self.slot)
     def test_dst_timezone(self):
         c=copy.deepcopy(DEFAULT);c['timezone']='America/New_York';validate_config(c)
@@ -157,6 +166,7 @@ class ClinicTests(unittest.TestCase):
         r=self.doc.call('doctor_block_time',args);self.assertEqual(len(r['details']['conflicts']),2);self.assertEqual(len(self.cal.events),4)
         self.doc.call('doctor_block_time',args|{'confirmation_token':r['confirmation_token']});self.assertEqual(len(self.cal.events),5)
     def test_sheet_failure_never_undoes_booking(self):
+        free_demo_day(self.cal.events,('a-demo',))  # patients book one appointment a day
         self.confirm(self.a,'book_my_appointment',{'start':self.slot,'request_id':'request-0001'});self.sheets.fail_next=True
         self.assertFalse(self.doc.call('doctor_sync_register',{})['synced']);self.assertEqual(len(self.cal.events),5)
         self.assertTrue(self.doc.call('doctor_sync_register',{})['synced'])

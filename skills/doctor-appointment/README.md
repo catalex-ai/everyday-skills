@@ -58,9 +58,13 @@ by telling the Doctor Assistant:
 - **Number per day**: no times. The doctor sets how many patients a day takes
   ("10 patients a day"), optionally split into new patients and follow-ups ("6
   new and 4 follow-ups"), and can change one day ("on Thursday I'll take 15").
-  Patients book a place on a day. With one total nobody is asked about visit
-  type; with a split, returning patients count as follow-ups automatically and
-  new patients are asked.
+  Patients book a place on a day, first come first served: each booking takes
+  the next 5 minutes on the doctor's calendar (5:00, 5:05, 5:10…, skipping
+  breaks and blocked time; the doctor can change the length), so the calendar
+  shows the queue in order and nothing overlaps. A cancelled place is not
+  refilled. Patients are told only the day. With one total nobody is asked about
+  visit type; with a split, returning patients count as follow-ups automatically
+  and new patients are asked.
   When a day fills up, the booking that took the last place records an alert in
   `config/doctor-alerts.json` (for a messaging connector to pick up) and the
   Doctor Assistant's next reply asks the doctor whether to take more that day.
@@ -133,14 +137,18 @@ Needed once per clinic Google account (a publisher-provided client is not shippe
    project and enable **Google Calendar API** and **Google Sheets API**.
 2. **Google Auth Platform**: set Branding (app name, support email), Audience
    (Internal if offered, otherwise External and add your account as a test
-   user), and Data Access for the three scopes below.
+   user), and Data Access for the three scopes below. With External, click
+   **Publish app** on the Audience page: in Testing, Google ends the sign-in
+   every 7 days. Google then shows a "hasn't verified this app" screen at
+   sign-in; click Advanced, then continue (it's your own app).
 3. **Clients** → create client → type **Desktop app** → download the JSON to a
    private folder outside `doctor-assistant/`. Never paste its contents in chat.
 
 Scopes: `calendar.events`, `calendar.readonly`, `spreadsheets`. No Drive or Gmail.
 Sign-in uses a browser loopback flow and stores the token only in macOS Keychain
-(no plaintext fallback). Testing-mode tokens may expire; run `google-setup
---client PATH` again. If the machine is lost, also remove the app from your
+(no plaintext fallback). The doctor signs in once, when setup lists calendars;
+the rest of setup reuses it. If the sign-in stops working (an app left in
+Testing expires after 7 days), run `google-setup --client PATH` again. If the machine is lost, also remove the app from your
 Google Account's third-party connections.
 
 The register has `Appointments` (ID, start/end, status, kind, last seen, issue)

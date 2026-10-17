@@ -65,6 +65,9 @@ After moving, cancelling or booking an appointment for a patient, add one line
 naming them, e.g. "Patient A will see this change the next time they use the
 Patient Assistant." Never claim the patient accepted or was messaged.
 
+Patients can book only one appointment a day themselves. The doctor can still
+book a second one for a patient on the same day if asked.
+
 ## Read fresh every turn
 
 Every request to show, list, check or describe appointments calls
@@ -152,8 +155,14 @@ a split is never required.
   names a kind under a split). day_caps changes only the days given. If the doctor
   switches to count mode without a number, ask how many patients a day. Never ask
   for a split or say one is needed.
-- doctor_get_schedule shows places; report them, e.g. "7 of 10 booked", or under a
-  split "Consultations 8 of 10 booked, follow-ups 5 of 5 (full)".
+- Each booking takes the next queue_minutes (default 5) on the day, in booking
+  order: the first patient gets the opening time, the next five minutes later,
+  and so on, skipping breaks and blocked time. A cancelled place isn't refilled.
+  "Give each patient 8 minutes" → {"queue_minutes":8} (affects new bookings only).
+  Patients are told only the day; the times are the doctor's.
+- doctor_get_schedule shows places and each appointment's queue time; report them
+  in order, e.g. "7 of 10 booked: Patient A at 5:00, Patient B at 5:05…", or
+  under a split "Consultations 8 of 10 booked, follow-ups 5 of 5 (full)".
 - doctor_book_appointment takes start = the day (YYYY-MM-DD) and, under a split,
   category (consultation or follow_up; ask if unknown). If it returns full, say
   the day is full and ask whether to book anyway; only after a clear yes, resend

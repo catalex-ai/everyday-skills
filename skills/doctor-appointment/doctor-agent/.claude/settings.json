@@ -11,6 +11,8 @@
       "mcp__clinic__doctor_get_appointment",
       "mcp__clinic__doctor_get_clinic_settings",
       "mcp__clinic__doctor_get_schedule",
+      "mcp__clinic__doctor_mark_no_show",
+      "mcp__clinic__doctor_mark_no_show",
       "mcp__clinic__doctor_open_spreadsheet",
       "mcp__clinic__doctor_reschedule_appointment",
       "mcp__clinic__doctor_review_issues",
@@ -54,5 +56,6 @@
     "allowUnsandboxedCommands": false,
     "failIfUnavailable": true
   },
-  "model": "haiku"
+  "model": "haiku",
+  "availableModels": ["haiku"]
 }

@@ -57,3 +57,22 @@ expired/replayed assertions fail, revocation terminates sessions, secrets are
 unreadable from patient and doctor model runtimes, independent confirmation is
 required for writes, and real Calendar/Sheets tests succeed before removing the
 hard live gate in reviewed code. No appointment database is needed.
+
+## Message rate limits (required before real patients)
+
+Booking limits stop a patient holding places, but not a script that just chats
+and runs up model cost. The gateway, which sees every patient message before the
+model does, enforces per verified patient (and per phone number and network
+address as a backstop):
+
+- 20 messages an hour and 60 a day. A normal booking, move or cancellation takes
+  3 to 6 messages, so this leaves room for several real tasks with retries.
+- 30 messages per conversation; after that, start a new conversation.
+- Messages over 1,000 characters are rejected before reaching the model.
+- A clinic-wide daily model budget; when it's reached, patients are told to call
+  the clinic and the doctor is told once.
+
+When a limit is hit, reply with a fixed message (no model call) giving the clinic
+phone number and when they can try again. Start strict and loosen from real usage
+data; log every limit hit so the doctor can see repeated offenders.
+

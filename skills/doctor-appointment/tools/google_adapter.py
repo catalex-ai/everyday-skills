@@ -82,6 +82,7 @@ class Calendar:
             'clinic':p.get('clinic'),'owner':p.get('owner'),'etag':e.get('etag'),'clinic_status':p.get('clinicStatus')}
         for k in ('agreed','mode','category'):
             if k in p:result[k]=p[k]
+        if p.get('lateCancel')=='true':result['late_cancel']=True
         for k in ('start','end'):
             v=e.get(k,{})
             if 'dateTime' in v:result[k]=v['dateTime']
@@ -91,6 +92,7 @@ class Calendar:
     def encode(e):
         private = {k:e[k] for k in ('clinic','kind','owner','agreed','mode','category') if e.get(k)}
         private['clinicStatus'] = e['status']
+        if 'late_cancel' in e:private['lateCancel']='true' if e['late_cancel'] else 'false'  # patch merges keys: write false to clear
         if e.get('owner'):
             private['patientScope'] = Calendar.patient_scope(e['clinic'],e['owner'])
         return {

@@ -85,7 +85,7 @@ class ClinicChangeTests(unittest.TestCase):
         lunch=self.patient.call('get_available_slots',{'day':self.day,'preferred_start':self.day+'T13:20:00+05:30'})
         self.assertEqual(lunch['requested_start_status'],'outside_clinic_hours')
         taken=self.patient.call('get_available_slots',{'day':self.day,'preferred_start':self.day+'T11:00:00+05:30'})  # blocked time
-        self.assertEqual(taken['requested_start_status'],'already_booked')
+        self.assertEqual(taken['requested_start_status'],'not_available')  # patients aren't told someone holds it
         self.assertIn(self.day+'T14:00:00+05:30',listed['slots']);self.assertIn(self.day+'T14:40:00+05:30',listed['slots'])
         off=self.patient.call('book_my_appointment',{'start':self.day+'T14:15:00+05:30','request_id':'patient-off-grid'})
         self.assertTrue(off['conflict']);self.assertNotIn('confirmation_token',off)

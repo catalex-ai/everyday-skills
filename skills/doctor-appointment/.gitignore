@@ -13,6 +13,7 @@ config/live-activation.json
 config/live.lock
 config/notices-seen.*
 config/doctor-alerts.*
+config/lookups.*
 config/runtime
 evals/runs/
 **/.claude/settings.local.json

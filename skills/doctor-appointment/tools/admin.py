@@ -172,7 +172,7 @@ def next_test_slot(calendar,c):
         if day.weekday() in c['working_days'] and (found:=finder.slots(day.isoformat())):return found[-1]
     raise AdminError('No free clinic slot in the next two weeks for the one-time test booking')
 
-SETTINGS=('clinic_name','timezone','working_days','opening','closing','breaks','duration_minutes','buffer_minutes','address','contact','confirmation_policy','cancellation_policy','booking_mode','daily_caps','queue_minutes')
+SETTINGS=('clinic_name','timezone','working_days','opening','closing','breaks','duration_minutes','buffer_minutes','address','contact','confirmation_policy','cancellation_policy','booking_mode','daily_caps','queue_minutes','booking_window_days','weekly_booking_limit','no_show_limit','cancel_cutoff_hours','daily_lookup_limit')
 
 def clinic_settings(pairs):
     """Validated non-secret clinic details, saved for both Google and on-this-computer storage."""
@@ -182,7 +182,7 @@ def clinic_settings(pairs):
     for pair in pairs:
         field,sep,raw=pair.partition('=')
         if not sep or field not in SETTINGS:raise AdminError('Use FIELD=VALUE with one of: '+', '.join(SETTINGS))
-        try:c[field]=json.loads(raw) if field in ('working_days','breaks','duration_minutes','buffer_minutes','daily_caps','queue_minutes') else raw
+        try:c[field]=json.loads(raw) if field in ('working_days','breaks','duration_minutes','buffer_minutes','daily_caps','queue_minutes','booking_window_days','weekly_booking_limit','no_show_limit','cancel_cutoff_hours','daily_lookup_limit') else raw
         except ValueError:raise AdminError(field+' needs a JSON value, e.g. working_days=[0,1,2,3,4] breaks=[["13:00","14:00"]]') from None
     c=validate_config(c);atomic(path,c)
     if LOCAL_STATE.exists():

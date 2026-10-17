@@ -45,5 +45,6 @@
     "allowUnsandboxedCommands": false,
     "failIfUnavailable": true
   },
-  "model": "haiku"
+  "model": "haiku",
+  "availableModels": ["haiku"]
 }

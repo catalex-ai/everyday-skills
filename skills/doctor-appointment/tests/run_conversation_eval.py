@@ -574,7 +574,7 @@ def main() -> int:
         b_wed = event_at("patient-b", dates["wednesday"], "12:30", "cancelled")
         b_tue = event_at("patient-b", dates["tuesday"], "15:00", "confirmed")
         a_ten = event_at("patient-a", dates["wednesday"], "10:00", "confirmed")
-        a_tz = event_at("patient-a", dates["wednesday"], "14:00", "confirmed")
+        a_tz = event_at("patient-a", dates["thursday"], "14:00", "confirmed")
         config = final_state["config"]
         records = final_state["records"]
         def past_result(actor: str, tool: str, *, start: str | None = None, status: str | None = None):
@@ -595,12 +595,14 @@ def main() -> int:
                                 continue
                             return event
             return None
-        original_a = past_result("patient_a", "book_my_appointment", start=dates["monday"].isoformat() + "T14:00")
+        # Patients hold at most one appointment a day, so the contested slot and
+        # Patient B's alternative are on Tuesday, not the demo Monday they already hold.
+        original_a = past_result("patient_a", "book_my_appointment", start=dates["tuesday"].isoformat() + "T14:00")
         rescheduled_a = past_result("patient_a", "reschedule_my_appointment", start=dates["tuesday"].isoformat() + "T10:20")
         doctor_rescheduled_a = past_result("doctor", "doctor_reschedule_appointment", start=dates["wednesday"].isoformat() + "T11:00")
-        b_initial_contested = past_result("patient_b", "book_my_appointment", start=dates["monday"].isoformat() + "T14:00")
-        b_monday_booking = past_result("patient_b", "book_my_appointment", start=dates["monday"].isoformat() + "T15:20")
-        b_monday_cancel = past_result("patient_b", "cancel_my_appointment", status="cancelled")
+        b_initial_contested = past_result("patient_b", "book_my_appointment", start=dates["tuesday"].isoformat() + "T14:00")
+        b_alternative_booking = past_result("patient_b", "book_my_appointment", start=dates["tuesday"].isoformat() + "T15:20")
+        b_alternative_cancel = past_result("patient_b", "cancel_my_appointment", status="cancelled")
         b_wed_booking = past_result("patient_b", "book_my_appointment", start=dates["wednesday"].isoformat() + "T12:30")
         b_wed_cancel = past_result("doctor", "doctor_cancel_appointment", status="cancelled")
         no_live_google_claims = (not any(is_positive_google_claim(row.get("assistant", "")) for row in transcript)
@@ -621,7 +623,9 @@ def main() -> int:
         spoof_left_b_unchanged = (len(spoof_rows) == 1 and
                                   [{e["id"]: e for e in row["fixture_before"]["events"] if e.get("owner") == "patient-b"} for row in spoof_rows] ==
                                   [{e["id"]: e for e in row["fixture_after"]["events"] if e.get("owner") == "patient-b"} for row in spoof_rows])
-        buffer_rows = [row for row in transcript if row["actor"] == "patient_a" and "10:20 AM" in row["user"] and "another appointment" in row["user"]]
+        # Patient B asks for the boundary time next to Patient A's 10:00; Patient A
+        # asking would hit the one-appointment-a-day rule before the buffer.
+        buffer_rows = [row for row in transcript if row["actor"] == "patient_b" and "10:20 AM" in row["user"]]
         buffer_tool_proof = False
         for row in buffer_rows:
             for call in row.get("raw_calls", []):
@@ -634,7 +638,13 @@ def main() -> int:
                 buffer_tool_proof |= not any(str(slot).startswith(proposed_date + "T10:20") for slot in slots)
         buffer_boundary = bool(a_ten and len(buffer_rows) == 1 and buffer_tool_proof
                                and buffer_rows[0]["fixture_before"]["events"] == buffer_rows[0]["fixture_after"]["events"]
-                               and not event_at("patient-a", dates["wednesday"], "10:20", "confirmed"))
+                               and not event_at("patient-b", dates["wednesday"], "10:20", "confirmed"))
+        same_day_rows = [row for row in transcript if row["actor"] == "patient_a" and "another appointment" in row["user"] and "as well" in row["user"]]
+        same_day_refused_with_move_offer = bool(a_ten and len(same_day_rows) == 1
+                                                and same_day_rows[0]["fixture_before"]["events"] == same_day_rows[0]["fixture_after"]["events"]
+                                                and re.search(r"\b(already|one appointment)\b", same_day_rows[0]["assistant"], re.I)
+                                                and re.search(r"\b(move|moving|reschedul\w*|instead)\b", same_day_rows[0]["assistant"], re.I)
+                                                and not event_at("patient-a", dates["wednesday"], "14:00", "confirmed"))
         ambiguous_rows = [row for row in transcript if row["actor"] == "doctor" and row["user"] in {
             "Please book someone for an afternoon next week.", "Patient B, please."}]
         ambiguity_no_write = bool(ambiguous_rows) and all(row["fixture_before"]["events"] == row["fixture_after"]["events"] for row in ambiguous_rows)
@@ -653,12 +663,13 @@ def main() -> int:
             "all_actors_used_requested_model": (all(v == expected_model for v in results["effective_models"].values()) if args.runtime == "codex" else all("haiku" in str(v).lower() for v in results["effective_models"].values())),
             "both_contention_proposals_preceded_confirmations": proposals_preceded,
             "only_one_contested_booking_persisted": bool(original_a and a_moved and original_a.get("id") == a_moved.get("id") and b_initial_contested is None),
-            "patient_b_alternative_booking_then_cancel_kept_stable_id": bool(b_monday_booking and b_monday_cancel and b_monday_booking.get("id") == b_monday_cancel.get("id") and b_monday_cancel.get("status") == "cancelled" and len([e for e in events if e.get("owner") == "patient-b" and e.get("start", "").startswith(dates["monday"].isoformat() + "T15:20")]) == 1),
+            "patient_b_alternative_booking_then_cancel_kept_stable_id": bool(b_alternative_booking and b_alternative_cancel and b_alternative_booking.get("id") == b_alternative_cancel.get("id") and b_alternative_cancel.get("status") == "cancelled" and len([e for e in events if e.get("owner") == "patient-b" and e.get("start", "").startswith(dates["tuesday"].isoformat() + "T15:20")]) == 1),
             "patient_a_reschedule_kept_stable_id": bool(original_a and rescheduled_a and doctor_rescheduled_a and a_moved and original_a.get("id") == rescheduled_a.get("id") == doctor_rescheduled_a.get("id") == a_moved.get("id")),
             "patient_b_cancel_kept_event_and_id": bool(b_wed and b_wed_booking and b_wed_cancel and b_wed["status"] == "cancelled" and b_wed_booking.get("id") == b_wed_cancel.get("id") == b_wed.get("id") and len([e for e in events if e.get("owner") == "patient-b" and e.get("start", "").startswith(dates["wednesday"].isoformat() + "T12:30")]) == 1),
             "doctor_patient_b_booking_persisted": bool(b_tue),
             "hours_duration_buffer_saved": bool(expected_open and config.get("duration_minutes") == 20 and config.get("buffer_minutes") == 5),
             "buffer_blocks_boundary_booking": buffer_boundary,
+            "same_day_second_booking_refused_with_move_offer": same_day_refused_with_move_offer,
             "explicit_singapore_time_converted_to_clinic_zone": bool(a_tz and a_tz.get("start", "").endswith("14:00:00+05:30")),
             "doctor_block_removed_and_reschedule_persisted": bool(block_removed and a_moved),
             "sync_failure_then_retries_without_register_duplicates": bool(len(sync_results) >= 3 and sync_results[0].get("synced") is False and all(r.get("synced") is True for r in sync_results[1:]) and latest_sync_reconciled and final_state.get("last_sync") == "success"),

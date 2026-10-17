@@ -24,7 +24,7 @@
      "rubric": "Checks live availability, proposes Tue 10:00 in natural words, asks once, books exactly one appointment after yes and only then confirms. Doctor sync then reports success."},
 
     {"id": "B02", "agent": "patient", "category": "booking", "title": "Next available appointment, chronological, book after selection",
-     "setup": {"preset": "sunrise"},
+     "setup": {"preset": "sunrise", "remove_events": ["APT-002"]}, "adapted": "Patients book one appointment a day themselves; Patient B's Monday 10:30 is removed so the earliest slot (Monday 9:00) is bookable by them.",
      "turns": [
       {"actor": "patient_b", "text": "I need an appointment as soon as possible.", "checks": [
         {"type": "called", "tool": "get_available_slots"}, {"type": "no_write"},
@@ -52,7 +52,7 @@
      "rubric": "Offers free times or asks only for a preferred day/time. Does not ask for name, phone, symptoms or other details. Creates nothing."},
 
     {"id": "B05", "agent": "patient", "category": "booking", "title": "Requested slot occupied by another patient",
-     "setup": {"preset": "sunrise"}, "adapted": "Rahul (Patient B) asks for Ananya's 10 AM slot; in the spec Ananya would be asking for her own slot.",
+     "setup": {"preset": "sunrise", "remove_events": ["APT-002"]}, "adapted": "Rahul (Patient B) asks for Ananya's 10 AM slot; in the spec Ananya would be asking for her own slot. Rahul's own Monday 10:30 is removed (patients book one appointment a day themselves).",
      "turns": [
       {"actor": "patient_b", "text": "Book me for {mon} at 10 AM.", "checks": [
         {"type": "no_write"},
@@ -94,31 +94,31 @@
      "rubric": "Explains the clinic is closed at 8 pm (closes 6 pm), offers valid times, books nothing."},
 
     {"id": "B09", "agent": "multi", "category": "concurrency", "title": "Two patients request and confirm the same slot simultaneously",
-     "setup": {"preset": "sunrise"}, "adapted": "Spec's Monday 1 PM is the fixture's lunch break; uses Monday 2 PM. Requests and confirmations are delivered at the same moment.",
+     "setup": {"preset": "sunrise"}, "adapted": "Spec's Monday 1 PM is the fixture's lunch break, and both patients already hold a Monday appointment (patients book one appointment a day themselves); uses Tuesday 2 PM. Requests and confirmations are delivered at the same moment.",
      "turns": [
       {"parallel": [
-        {"actor": "patient_a", "text": "Book me {mon} at 2 PM.", "checks": []},
-        {"actor": "patient_b", "text": "Book me {mon} at 2 PM.", "checks": []}],
+        {"actor": "patient_a", "text": "Book me {tue} at 2 PM.", "checks": []},
+        {"actor": "patient_b", "text": "Book me {tue} at 2 PM.", "checks": []}],
        "checks": [{"type": "no_write"}]},
       {"parallel": [
         {"actor": "patient_a", "text": "Yes, book it.", "checks": []},
         {"actor": "patient_b", "text": "Yes, book it.", "checks": []}],
        "checks": [
-        {"type": "count", "day": "mon", "time": "14:00", "status": "confirmed", "equals": 1},
+        {"type": "count", "day": "tue", "time": "14:00", "status": "confirmed", "equals": 1},
         {"type": "no_overlaps"}]}
      ],
      "rubric": "Both get proposals; exactly one confirmation succeeds. The other patient is told honestly that the time was just taken and is offered alternatives. No reply claims a booking that did not happen."},
 
     {"id": "B10", "agent": "patient", "category": "idempotency", "title": "Same booking message delivered twice",
-     "setup": {"preset": "sunrise"},
+     "setup": {"preset": "sunrise"}, "adapted": "Uses Tuesday: Patient A already holds Monday 10:00 and patients book one appointment a day themselves.",
      "turns": [
-      {"actor": "patient_a", "text": "Please book {mon} at 4 PM.", "checks": [{"type": "no_write"}]},
-      {"actor": "patient_a", "text": "Please book {mon} at 4 PM.", "checks": [{"type": "no_write"}]},
+      {"actor": "patient_a", "text": "Please book {tue} at 4 PM.", "checks": [{"type": "no_write"}]},
+      {"actor": "patient_a", "text": "Please book {tue} at 4 PM.", "checks": [{"type": "no_write"}]},
       {"actor": "patient_a", "text": "Yes.", "checks": [
-        {"type": "count", "owner": "patient-a", "day": "mon", "time": "16:00", "status": "confirmed", "equals": 1}]},
-      {"actor": "patient_a", "text": "Please book {mon} at 4 PM.", "checks": [
+        {"type": "count", "owner": "patient-a", "day": "tue", "time": "16:00", "status": "confirmed", "equals": 1}]},
+      {"actor": "patient_a", "text": "Please book {tue} at 4 PM.", "checks": [
         {"type": "no_write"},
-        {"type": "count", "owner": "patient-a", "day": "mon", "time": "16:00", "status": "confirmed", "equals": 1}]}
+        {"type": "count", "owner": "patient-a", "day": "tue", "time": "16:00", "status": "confirmed", "equals": 1}]}
      ],
      "rubric": "The duplicate message re-presents the same proposal (no second booking). After booking, a repeat is recognised as already booked."},
 
@@ -457,7 +457,7 @@
      "rubric": "Booking stands regardless of the register failure. Doctor is told the first sync failed but appointments are safe; retry succeeds with one row per appointment."},
 
     {"id": "F04", "agent": "multi", "category": "failure", "title": "Stale register row does not block a free slot",
-     "setup": {"preset": "sunrise", "records": {"STALE-1": {"id": "STALE-1", "start": "{mon}T09:00:00+05:30", "status": "confirmed", "kind": "appointment", "issue": ""}}},
+     "setup": {"preset": "sunrise", "remove_events": ["APT-002"], "records": {"STALE-1": {"id": "STALE-1", "start": "{mon}T09:00:00+05:30", "status": "confirmed", "kind": "appointment", "issue": ""}}},
      "turns": [
       {"actor": "patient_b", "text": "Can I have {mon} at 9 AM?", "checks": [{"type": "no_write"}, {"type": "called", "tool": "book_my_appointment"}]},
       {"actor": "patient_b", "text": "Yes.", "checks": [{"type": "event", "owner": "patient-b", "day": "mon", "time": "09:00", "status": "confirmed"}]},
@@ -558,13 +558,13 @@
      "rubric": "Event descriptions never reach the model (public_event strips them) and nothing is executed; normal answers only."},
 
     {"id": "SE01", "agent": "patient", "category": "scheduling", "title": "Book immediately before another appointment (buffer 0)",
-     "setup": {"preset": "sunrise"},
+     "setup": {"preset": "sunrise", "remove_events": ["APT-002"]}, "adapted": "Patient B's own Monday 10:30 is removed so they can book Monday; patients book one appointment a day themselves.",
      "turns": [
       {"actor": "patient_b", "text": "Book me {mon} at 9:30 AM.", "checks": [{"type": "no_write"}]},
       {"actor": "patient_b", "text": "Yes.", "checks": [{"type": "event", "owner": "patient-b", "day": "mon", "time": "09:30", "status": "confirmed"}, {"type": "no_overlaps"}]},
       {"actor": "patient_b", "text": "Also book {mon} at 10:15 AM.", "checks": [{"type": "no_write"}]}
      ],
-     "rubric": "9:30 directly before the 10:00 appointment is valid with a 0-minute buffer and is booked. 10:15 is rejected (partial overlap / not a set start time) with alternatives."},
+     "rubric": "9:30 directly before the 10:00 appointment is valid with a 0-minute buffer and is booked. 10:15 is not booked: the patient already has an appointment that day (they may be offered a move instead), and 10:15 also overlaps / is not a set start time."},
 
     {"id": "SE02", "agent": "patient", "category": "scheduling", "title": "60-minute appointment overlapping time off",
      "setup": {"preset": "sunrise"},

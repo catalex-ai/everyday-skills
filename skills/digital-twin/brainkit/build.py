@@ -27,13 +27,14 @@ def allowed_items(persona: str) -> list[dict]:
 
 
 def hidden_people(allowed_cats: set[str], dic: dict | None = None) -> set[str]:
-    """People linked to the owner only through edges this persona cannot see.
+    """People with any link to the owner that this persona cannot see.
 
-    A fact about such a person would reveal the hidden relationship, whatever
-    category it was filed under, so it is withheld from the persona."""
+    A fact about such a person can reveal the hidden relationship (a child who
+    is also a co-worker), whatever category it was filed under, so the person's
+    own facts are withheld. Facts about the owner that name them still show."""
     dic = dic if dic is not None else policy.dictionary()
     seen: dict[str, bool] = {}
-    for it in raw.items():
+    for it in raw.items():  # active items of every category
         e = it.get("edge") or {}
         if not e.get("rel") or e.get("o") is None:
             continue
@@ -41,8 +42,9 @@ def hidden_people(allowed_cats: set[str], dic: dict | None = None) -> set[str]:
         if "me" not in (s, o) or s == o:
             continue
         other = o if s == "me" else s
-        seen[other] = seen.get(other, False) or it["category"] in allowed_cats
-    return {p for p, visible in seen.items() if not visible}
+        if it["category"] not in allowed_cats:
+            seen[other] = True
+    return {p for p, hidden in seen.items() if hidden}
 
 
 def _without_hidden_people(items: list[dict], allowed_cats: set[str]) -> list[dict]:

@@ -177,11 +177,13 @@ def _phrase_index(dictionary: dict) -> dict:
         name = " ".join(t for t in rel.split("_") if t and t not in _DROP_IN_NAMES and len(t) > 2)
         if name:
             st = tuple(_stem(t) for t in _tokens(name))
-            have = {_stored(r, dictionary)[0] for r, _ in idx.get(st, [])}
+            have = {_stored(c[0], dictionary)[0] for c in idx.get(st, [])}
             if rels[rel].get("inverse") in rels and _stored(rel, dictionary)[0] in have:
                 continue  # a defined pair already says which way this word points
-            add(name, (rel, "out"))
-            add(name, (rel, "in"))
+            # Read off the relation's name, so a guess: tried only after the
+            # words the dictionary states.
+            add(name, (rel, "out", "guess"))
+            add(name, (rel, "in", "guess"))
     return idx
 
 
@@ -247,8 +249,9 @@ def _step(graph, dictionary, values, cands, prefer):
     """Apply one relation to a list of nodes. First candidate (in preference order)
     that yields anything wins. Returns (nodes, edge triples)."""
     rels = dictionary.get("relations") or {}
-    order = sorted(cands, key=lambda c: (c[1] != prefer, cands.index(c)))
-    for rel, d in order:
+    order = sorted(cands, key=lambda c: (len(c) > 2, c[1] != prefer, cands.index(c)))
+    for c in order:
+        rel, d = c[0], c[1]
         name, flipped = _stored(rel, dictionary)
         if flipped:
             d = "in" if d == "out" else "out"

@@ -123,3 +123,18 @@ def test_facts_about_hidden_relatives_stay_out():
     assert "Ravi works at Northwind Ltd" not in pro
     assert "Asha works at Northwind Ltd" in pro and "I work at Northwind Ltd" in pro
     assert "Ravi works at Northwind Ltd" in home
+
+
+def test_relative_who_is_also_a_coworker_stays_hidden():
+    raw.add_items([
+        {"text": "My daughter is Mira", "category": "family",
+         "edge": {"s": "Mira", "rel": "child_of", "o": "me"}},
+        {"text": "I worked with Mira on a project", "category": "work",
+         "edge": {"s": "me", "rel": "worked_with", "o": "Mira"}},
+        {"text": "Mira studied design", "category": "work", "about": "Mira"},
+    ])
+    policy.set_rule("pro", "work", "allow")
+    build.rebuild("pro")
+    pro = [f["text"] for f in store.read_jsonl(store.persona_dir("pro") / "facts.jsonl")]
+    assert "Mira studied design" not in pro
+    assert "I worked with Mira on a project" in pro

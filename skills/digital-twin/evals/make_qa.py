@@ -10,6 +10,7 @@ satisfied by any one alias; for aggregates it is the count as digit and word.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from collections import OrderedDict
 from pathlib import Path
@@ -92,6 +93,13 @@ def worst(*classes: str) -> str:
 
 def uniq(xs):
     return list(OrderedDict.fromkeys(x for x in xs if x))
+
+
+def fold(s: str) -> str:
+    import unicodedata
+    s = unicodedata.normalize("NFKD", s or "")
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return re.sub(r"\s+", " ", s.casefold())
 
 
 def main(argv: list[str]) -> int:
@@ -179,6 +187,23 @@ def main(argv: list[str]) -> int:
                        "kind": "leak", "must": uniq(x for r in rows for x in r["o_aliases"]),
                        "cls": "personal", "should_know": sk, "must_not_know": mn})
             n += 1
+    # Grounding: keep a question only if one of its answers is stated somewhere in
+    # the corpus text (sources or held-back notes). Counts are kept when every
+    # counted name is stated. Anything else measures Wikidata, not the twin.
+    if "--all" not in argv:
+        corpus_text = " ".join(fold(p.read_text(encoding="utf-8", errors="ignore"))
+                               for sub in ("sources", "heldout") for p in sorted((d / sub).glob("*.txt")))
+        def grounded(i):
+            if i["kind"] == "aggregate":
+                return True
+            if i["kind"] == "path":
+                target = i["q"].removeprefix("how am I connected to ").rstrip("?")
+                if fold(target) not in corpus_text:
+                    return False
+            return any(fold(a) and fold(a) in corpus_text for a in i["must"] if not str(a).isdigit())
+        before = len(qa)
+        qa[:] = [i for i in qa if grounded(i)]
+        print(f"dropped {before - len(qa)} questions whose answer no document states")
     for n, i in enumerate(qa):
         i["id"] = f"{i['kind']}-{n:03d}"
     (d / "qa.json").write_text(json.dumps(qa, indent=1, ensure_ascii=False))

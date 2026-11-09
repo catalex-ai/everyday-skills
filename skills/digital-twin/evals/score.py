@@ -29,12 +29,24 @@ def fold(s: str) -> str:
     return re.sub(r"\s+", " ", s.casefold()).strip()
 
 
+def _forms(alias: str) -> list[str]:
+    """An alias, plus its given-name form when it has a family name ("Asha Rao" -> "asha")."""
+    a = fold(str(alias))
+    toks = a.split()
+    out = [a]
+    if len(toks) >= 2 and not any(ch.isdigit() for ch in a):
+        given = " ".join(toks[:-1])
+        if len(given) >= 4:
+            out.append(given)
+    return out
+
+
 def has_any(text: str, aliases: list[str]) -> bool:
     t = fold(text)
-    for a in aliases:
-        a = fold(str(a))
-        if a and re.search(r"(?<!\w)" + re.escape(a) + r"(?!\w)", t):
-            return True
+    for al in aliases:
+        for a in _forms(al):
+            if a and re.search(r"(?<!\w)" + re.escape(a) + r"(?!\w)", t):
+                return True
     return False
 
 

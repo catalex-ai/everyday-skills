@@ -29,6 +29,24 @@ The owner gives you text, a file or a link. Read it yourself. Then:
    - Bad: "He led Project Atlas." (not first person)
    Facts about other people stay first person from the owner's side: "My sister
    Asha lives in Pune." One fact per line, never two facts joined by "and".
+   **One fact, one type of information.** If a sentence mixes types, split it,
+   and keep the relationship out of the other fact. "My wife Asha co-founded
+   Northwind Ltd with me" becomes two facts: "Asha co-founded Northwind Ltd with
+   me." (work) and "Asha is my wife." (family). Otherwise a persona that may
+   know about work but not family learns about the family through the work fact.
+
+   **People and organisations close to the owner get their own facts.** For
+   family, partners, close colleagues, co-founders and companies the owner is
+   tied to, file what the material says about them (what they do, where they
+   studied, where they are from, who their own family is), with `about` set to
+   their name and an edge for each relationship. Those facts answer questions
+   like "where did my wife study?" or "who is my manager's manager?". Skip
+   material that has no link to the owner or to these people.
+
+   **One name per person.** When someone appears under more than one name ("Asha",
+   "Asha Rao", "Asha R."), choose the fullest name, use it in every edge, and call
+   `add_alias` for each other name.
+
 2. **Pick a category for each fact.** A category is a generic noun phrase for a
    TYPE of information: "work history", "education", "family", "health",
    "contact details", "opinions", "skills", "places lived".
@@ -43,7 +61,9 @@ The owner gives you text, a file or a link. Read it yourself. Then:
      persona whose include or exclude clearly decides the new category. The
      owner already decided when they described the persona. Leave it unset
      only when the contract truly does not say, so that it becomes a question.
-3. **Add edges** for every relationship between named things. An edge is
+3. **Add edges** for every relationship between named things. An edge belongs to
+   the category of the relationship, not of the document it came from: a spouse
+   edge is family, even when it is found in a work document. An edge is
    `(subject, relation, object)`: `{"s":"me","rel":"works_at","o":"Northwind Ltd"}`.
    Names are information. People, companies and places are stored as entities.
 4. **Define relations** you have not used before with `define_relation(name,

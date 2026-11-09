@@ -90,10 +90,14 @@ def brief() -> str:
         e = _load()
     except _Unavailable:
         return NO_PERSONA
+    import re
     parts = []
     for title, name in (("Soul", "soul.md"), ("Voice", "voice.md"), ("Rules", "rules.md")):
-        parts.append(f"# {title}\n\n{_read_text(e['dir'], name)}")
-    return "\n\n".join(parts)
+        body = re.sub(r"<!--.*?-->", "", _read_text(e['dir'], name), flags=re.S)
+        body = re.sub(r"^#\s+" + title + r"\s*$", "", body, flags=re.M | re.I).strip()
+        if body:
+            parts.append(f"# {title}\n{body}")
+    return "\n\n".join(parts) or "Answer briefly, in the first person."
 
 
 @mcp.tool()

@@ -21,7 +21,36 @@ def _json(obj) -> str:
 
 def allowed_items(persona: str) -> list[dict]:
     cats = sorted(c for c, d in policy.rules(persona).items() if d == "allow")
-    return raw.items(categories=cats) if cats else []
+    if not cats:
+        return []
+    return _without_hidden_people(raw.items(categories=cats), set(cats))
+
+
+def hidden_people(allowed_cats: set[str], dic: dict | None = None) -> set[str]:
+    """People linked to the owner only through edges this persona cannot see.
+
+    A fact about such a person would reveal the hidden relationship, whatever
+    category it was filed under, so it is withheld from the persona."""
+    dic = dic if dic is not None else policy.dictionary()
+    seen: dict[str, bool] = {}
+    for it in raw.items():
+        e = it.get("edge") or {}
+        if not e.get("rel") or e.get("o") is None:
+            continue
+        s, o = graph.canonical(e.get("s") or it.get("about") or "me", dic), graph.canonical(e["o"], dic)
+        if "me" not in (s, o) or s == o:
+            continue
+        other = o if s == "me" else s
+        seen[other] = seen.get(other, False) or it["category"] in allowed_cats
+    return {p for p, visible in seen.items() if not visible}
+
+
+def _without_hidden_people(items: list[dict], allowed_cats: set[str]) -> list[dict]:
+    dic = policy.dictionary()
+    hidden = hidden_people(allowed_cats, dic)
+    if not hidden:
+        return items
+    return [i for i in items if graph.canonical(i.get("about") or "me", dic) not in hidden]
 
 
 def _clean(items: list[dict]) -> list[dict]:

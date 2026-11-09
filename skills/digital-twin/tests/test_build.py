@@ -101,3 +101,25 @@ def test_rebuild_all():
     out = build.rebuild_all()
     assert set(out) == {"pro", "home"} and out["pro"]["facts"] == 1 and out["home"]["facts"] == 0
     assert questions  # module import sanity
+
+
+def test_facts_about_hidden_relatives_stay_out():
+    raw.add_items([
+        {"text": "My son is Ravi", "category": "family",
+         "edge": {"s": "me", "rel": "child", "o": "Ravi"}},
+        {"text": "Ravi works at Northwind Ltd", "category": "work", "about": "Ravi"},
+        {"text": "Asha leads my team", "category": "work", "about": "Asha",
+         "edge": {"s": "Asha", "rel": "manager_of", "o": "me"}},
+        {"text": "Asha works at Northwind Ltd", "category": "work", "about": "Asha"},
+        {"text": "I work at Northwind Ltd", "category": "work"},
+    ])
+    policy.set_rule("pro", "work", "allow")
+    policy.set_rule("home", "work", "allow")
+    policy.set_rule("home", "family", "allow")
+    build.rebuild("pro")
+    build.rebuild("home")
+    pro = [f["text"] for f in store.read_jsonl(store.persona_dir("pro") / "facts.jsonl")]
+    home = [f["text"] for f in store.read_jsonl(store.persona_dir("home") / "facts.jsonl")]
+    assert "Ravi works at Northwind Ltd" not in pro
+    assert "Asha works at Northwind Ltd" in pro and "I work at Northwind Ltd" in pro
+    assert "Ravi works at Northwind Ltd" in home

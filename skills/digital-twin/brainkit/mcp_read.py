@@ -61,6 +61,12 @@ def _load() -> dict:
     return entry
 
 
+REPLY_HINT = ("(Use only the lines above that answer the question. Reply as the owner, "
+              "in one or two plain sentences. If none answer it, reply only: "
+              "I don't have anything on that to share.)")
+NOTHING_HINT = "(Reply only: I don't have anything on that to share.)"
+
+
 def _read_text(d, name: str) -> str:
     try:
         return (d / name).read_text(encoding="utf-8").strip()
@@ -116,14 +122,14 @@ def search(q: str) -> str:
         for h in e["index"].search(q, k=8):
             parts.append(f"- {h['text']} [{h['id']}]")
     if not parts:
-        return "Nothing found."
+        return "Nothing found. " + NOTHING_HINT
     out, total = [], 0
     for p in parts:
         if total + len(p) > MAX_CHARS and out:
             break
         out.append(p[:MAX_CHARS])
         total += len(p) + 1
-    return "\n".join(out)
+    return "\n".join(out) + "\n\n" + REPLY_HINT
 
 
 @mcp.tool()
@@ -133,7 +139,7 @@ def walk(q: str) -> str:
         e = _load()
     except _Unavailable:
         return NO_PERSONA
-    return _walk(e, q) or "No connection found in what I know."
+    return _walk(e, q) or "No connection found in what I know. " + NOTHING_HINT
 
 
 @mcp.tool()

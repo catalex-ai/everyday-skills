@@ -15,10 +15,11 @@
 - Dependencies: only `mcp`, `model2vec`, `PyYAML` at runtime, plus `pytest` for dev.
 - Brain path is `TWIN_HOME` env var, otherwise `~/.twin/brain`. Never inside the repo.
 - No person's name, profession or domain appears in skill code, prompts, templates or committed eval files. The eval seed is CLI-only, and corpora live in `~/.twin-corpora/`.
-- No PII on disk in any zone: email, phone, street address, postcode, ID numbers, personal URLs or handles, full date of birth, pay amounts.
+- PII handling follows spec Revision B: per-type modes allow|hold|drop in `privacy.yaml`; defaults email/phone/address=hold, password/bank_account/card/gov_id=drop, everything else allow. Names are information. Writes redact, never refuse.
+- Raw store is `raw/brain.sqlite` with the schema in spec Revision B.
 - Approval is per persona × category, never per item.
 - The twin's read server opens only `personas/<active>/`, and SQLite with `mode=ro`.
-- Gate findings report type and offset, never the matched value.
+- Gate findings report type and offset, never the matched value. Tokens: `⟦<type>:<6 hex>⟧` for hold, `⟦<type>⟧` for drop.
 
 ## Review Focus
 

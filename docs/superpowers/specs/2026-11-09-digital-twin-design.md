@@ -247,3 +247,48 @@ haiku).
   category rule.
 - Work metrics are kept. Pay is not.
 - Approval and conflict questions rank above information questions.
+
+## Revision B (2026-11-09): PII is a setting, raw is indexed
+
+This replaces the "PII gate" and anti-goal lines above wherever they conflict.
+
+**Names are information.** People, organisations and places are stored as
+entities. Whether a persona may know about someone is a category rule.
+
+**PII types have a mode, set by the owner through the manager** in
+`privacy.yaml`, and can be changed at any time:
+
+| mode | stored text | value kept | persona sees |
+|---|---|---|---|
+| `allow` | value as written | in text | value |
+| `hold` | token `⟦email:3fa9c1⟧` | `held` table only, manager zone | nothing (token stripped) |
+| `drop` | token `⟦password⟧` | nowhere | nothing |
+
+Defaults: `email`, `phone` and `address` (contact details) are `hold`.
+`password`, `bank_account`, `card` and `gov_id` are `drop`. Everything else is
+`allow`, including names, dates and work numbers.
+
+Writes never refuse. Every write calls `gate.redact(text)`, which applies the
+modes and returns tokenised text plus the held values. Switching
+`hold → allow` swaps the held values back in during rebuild. Switching
+`allow → hold` re-redacts stored rows in place. `drop` cannot be undone, and
+the manager says so before setting it. A mode change re-redacts in SQLite,
+then rebuilds every persona, without any model reading the material again.
+
+**Raw is one indexed SQLite file**, `raw/brain.sqlite`:
+
+```
+sources(id PK, origin, added, text)                 -- tokenised
+items(id PK, text, about, category, edge_s, edge_rel, edge_o,
+      src, since, conf, by, status, created, updated)
+      INDEX(category), INDEX(about), INDEX(status)
+held(token PK, type, value, src)
+categories(slug PK, description)
+rules(persona, category, decision, PRIMARY KEY(persona, category))
+personas(slug PK, audience, include, exclude, created)
+```
+
+Questions, the ledger, corrections and the log stay as JSON/JSONL files next
+to it. A rule change rebuilds only the persona it names, and selects its items
+by `category` through the index. The persona folders are unchanged:
+generated files, never hand-edited.

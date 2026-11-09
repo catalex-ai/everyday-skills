@@ -261,3 +261,33 @@ def test_router_real_shape():
               "how many siblings do I have?"):
         assert router.needs_graph(q, REAL_G, REAL_D), q
     assert not router.needs_graph("what languages do I speak", REAL_G, REAL_D)
+
+
+def test_you_and_your_mean_the_owner():
+    from brainkit import graph as G
+    g = G.build_graph([
+        {"id": "f1", "about": "me", "text": "My son is Ravi", "category": "family",
+         "edge": {"s": "me", "rel": "child", "o": "Ravi"}},
+    ], {"relations": {"child": {"words": ["child", "children", "son"], "inverse_words": ["parent"]}}})
+    dic = {"relations": {"child": {"words": ["child", "children", "son"], "inverse_words": ["parent"]}}}
+    assert any("Ravi" in r["restated"] for r in G.walk("who are your children", g, dic))
+    assert any("Ravi" in r["restated"] for r in G.walk("who are my children", g, dic))
+
+
+def test_clashing_inverse_words_do_not_flip_direction():
+    from brainkit import graph as G
+    dic = {"relations": {
+        "child_of": {"inverse": "parent_of", "words": ["father", "mother", "parent"],
+                     "inverse_words": ["child", "son", "daughter"]},
+        "parent_of": {"inverse": "child_of", "words": ["parent", "mother", "father"],
+                      "inverse_words": ["child", "son", "daughter"]}}}
+    g = G.build_graph([
+        {"id": "f1", "about": "me", "text": "x", "category": "family",
+         "edge": {"s": "Ravi", "rel": "child_of", "o": "me"}},
+        {"id": "f2", "about": "me", "text": "y", "category": "family",
+         "edge": {"s": "me", "rel": "child_of", "o": "Lata"}},
+    ], dic)
+    kids = " ".join(r["restated"] for r in G.walk("who are your children", g, dic))
+    assert "Ravi" in kids and "Lata" not in kids
+    mum = " ".join(r["restated"] for r in G.walk("who is my mother", g, dic))
+    assert "Lata" in mum and "Ravi" not in mum

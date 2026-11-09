@@ -76,7 +76,7 @@ def test_relational_walk_first():
     assert out.splitlines()[0].startswith("The ") and "Lakeside College" in out.splitlines()[0]
     assert "because:" in out and "Asha —" in out
     assert "Lakeside College" in mcp_read.walk("where did my spouse study")
-    assert mcp_read.walk("who is the moon").startswith("No connection found in what I know.")
+    assert mcp_read.walk("who is the moon").startswith("No connection found.")
     assert len(out) <= 1900 + len(mcp_read.REPLY_HINT) + 2
 
 

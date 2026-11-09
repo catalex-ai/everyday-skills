@@ -10,7 +10,8 @@ import re
 from collections import deque
 
 SELF = "me"
-PRONOUNS = {"i", "me", "my", "myself"}
+# The twin talks to other people, so "you" and "your" also mean the owner.
+PRONOUNS = {"i", "me", "my", "myself", "mine", "you", "your", "yours", "yourself"}
 MAX_PATH = 4
 
 # Grammar words only (no relation vocabulary). Anything else left over after
@@ -157,13 +158,28 @@ def _phrase_index(dictionary: dict) -> dict:
         if cand not in lst:
             lst.append(cand)
 
-    for rel in sorted(rels):
+    # Edges live under a pair's stored name. That relation's own words go in
+    # first; its partner only adds words the stored one does not already claim,
+    # so a pair written with clashing words cannot flip the answer.
+    claimed: dict[str, set] = {}
+    order = sorted(rels, key=lambda r: (_stored(r, dictionary)[1], r))
+    for rel in order:
+        stored, flipped = _stored(rel, dictionary)
         for key, d in (("words", "out"), ("inverse_words", "in")):
             for w in rels[rel].get(key) or []:
+                st = tuple(_stem(t) for t in _tokens(w))
+                if flipped and stored in claimed.get(st, set()):
+                    continue
+                if not flipped:
+                    claimed.setdefault(st, set()).add(rel)
                 add(w, (rel, d))
     for rel in sorted(rels):
         name = " ".join(t for t in rel.split("_") if t and t not in _DROP_IN_NAMES and len(t) > 2)
         if name:
+            st = tuple(_stem(t) for t in _tokens(name))
+            have = {_stored(r, dictionary)[0] for r, _ in idx.get(st, [])}
+            if rels[rel].get("inverse") in rels and _stored(rel, dictionary)[0] in have:
+                continue  # a defined pair already says which way this word points
             add(name, (rel, "out"))
             add(name, (rel, "in"))
     return idx

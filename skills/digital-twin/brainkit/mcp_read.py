@@ -139,7 +139,9 @@ def walk(q: str) -> str:
         e = _load()
     except _Unavailable:
         return NO_PERSONA
-    return _walk(e, q) or "No connection found in what I know. " + NOTHING_HINT
+    return _walk(e, q) or ("No connection found. Answer from the search results instead; "
+                           "if they do not answer it either, reply only: "
+                           "I don't have anything on that to share.")
 
 
 @mcp.tool()

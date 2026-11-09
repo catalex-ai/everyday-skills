@@ -106,3 +106,17 @@ def test_apply_privacy_after_allow_to_hold():
     assert "98765" not in raw.get(iid)["text"] and "⟦phone:" in raw.get(iid)["text"]
     assert "+91 98765 43210" in raw.held_map().values()
     assert raw.apply_privacy() == {"sources": 0, "items": 0}
+
+
+def test_hold_to_drop_purges_held_values(tmp_path, monkeypatch):
+    monkeypatch.setenv("TWIN_HOME", str(tmp_path))
+    from brainkit import store, raw, policy, gate
+    store.init()
+    policy.define_category("contact", "contact details")
+    raw.add_items([{"text": "Write to me at asha.k@northwind.example", "category": "contact"}])
+    assert raw.held_map()
+    gate.set_mode("email", "drop")
+    raw.apply_privacy()
+    assert raw.held_map() == {}
+    assert "⟦email⟧" in raw.items()[0]["text"]
+    assert b"asha.k@northwind" not in (tmp_path / "raw" / "brain.sqlite").read_bytes()

@@ -1,0 +1,64 @@
+# Completeness template. The engine turns uncovered facets into information questions.
+# weight: how much the gap matters (score = weight * 0.5 ** times_asked).
+# keywords: matched (prefix, case-insensitive) against the text and category of the
+#   facts about the entity. Any hit means the facet is covered.
+# applies_to: me | all | {object_of: [relations]} | unlinked_person
+# question: hint for the manager, {about} is the entity name.
+facets:
+  - name: current_role
+    weight: 1.0
+    applies_to: me
+    keywords: [currently, now, works at, working at, works as, role, job, position, title, employed, founder, lead, manager, engineer, consultant]
+    question: "What do you do now? Role, organisation, and what a typical week looks like."
+  - name: past_roles
+    weight: 0.8
+    applies_to: me
+    keywords: [previously, formerly, earlier, used to, before that, past, former, joined, left, worked at, career]
+    question: "What did you do before your current role? Roles and organisations, roughly when."
+  - name: education
+    weight: 0.7
+    applies_to: me
+    keywords: [studied, degree, university, college, school, graduated, bachelor, master, phd, diploma, certified, course]
+    question: "Where did you study, and what?"
+  - name: skills
+    weight: 0.8
+    applies_to: me
+    keywords: [skill, expert, proficient, experience in, specialis, specializ, fluent, speaks, strong at, good at, tools, languages]
+    question: "What are you best at? Skills, tools, languages."
+  - name: notable_work
+    weight: 0.8
+    applies_to: me
+    keywords: [project, built, shipped, launched, delivered, created, designed, award, published, patent, product]
+    question: "What work or projects are you proudest of?"
+  - name: people
+    weight: 0.6
+    applies_to: me
+    keywords: [colleague, teammate, team, reports to, works with, mentor, collaborat, partner, cofounder, co-founder]
+    question: "Who do you work with most? Names and how you work together."
+  - name: location
+    weight: 0.5
+    applies_to: me
+    keywords: [lives, based, located, city, moved, resides, born in]
+    question: "Which city are you based in? City level is enough."
+  - name: one_line
+    weight: 0.5
+    applies_to: me
+    keywords: [summary, bio, described as, in short, known for, headline, tagline, i am a]
+    question: "How would you describe yourself in one line?"
+  - name: your_part
+    weight: 0.7
+    applies_to:
+      object_of: [works_at, worked_at, founded, led, leads, built, owns, member_of, part_of, contributed_to, employed_by]
+    keywords: [role, led, built, owned, responsible, managed, designed, contributed, worked on, shipped, as a, as the]
+    question: "What was your part in {about}?"
+  - name: outcome
+    weight: 0.6
+    applies_to:
+      object_of: [works_at, worked_at, founded, led, leads, built, owns, member_of, part_of, contributed_to, employed_by]
+    keywords: [result, outcome, achieved, delivered, increased, reduced, launched, shipped, saved, improved, grew, won, completed, "%"]
+    question: "What came of {about}? Outcome or result."
+  - name: how_known
+    weight: 0.6
+    applies_to: unlinked_person
+    keywords: []
+    question: "How do you know {about}?"

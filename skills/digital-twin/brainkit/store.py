@@ -55,6 +55,8 @@ def db() -> sqlite3.Connection:
     h = init()
     con = sqlite3.connect(h / "raw" / "brain.sqlite")
     con.row_factory = sqlite3.Row
+    # Overwrite deleted content so purged PII does not linger in free pages.
+    con.execute("PRAGMA secure_delete=ON")
     return con
 
 

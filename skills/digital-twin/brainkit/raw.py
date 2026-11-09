@@ -117,13 +117,23 @@ def held_map() -> dict:
         con.close()
 
 
+def _demote(text, dropped):
+    """Turn hold tokens of types now set to drop into plain drop tokens."""
+    if text is None or not dropped:
+        return text
+    import re
+    return re.sub(r"⟦(" + "|".join(map(re.escape, dropped)) + r"):[0-9a-f]+⟧", r"⟦\1⟧", text)
+
+
 def apply_privacy() -> dict:
     con = store.db()
     ns = ni = 0
+    dropped = sorted(t for t, m in gate.settings().items() if m == "drop")
     try:
         with con:
             for r in con.execute("SELECT id,text FROM sources").fetchall():
                 new, held = gate.redact(r["text"], r["id"])
+                new = _demote(new, dropped)
                 _save_held(con, held)
                 if new != r["text"]:
                     con.execute("UPDATE sources SET text=? WHERE id=?", (new, r["id"]))
@@ -132,11 +142,14 @@ def apply_privacy() -> dict:
                 new, held = gate.redact(r["text"], r["src"])
                 eo, h2 = (gate.redact(r["edge_o"], r["src"]) if r["edge_o"] is not None
                           else (None, []))
+                new, eo = _demote(new, dropped), _demote(eo, dropped)
                 _save_held(con, held + h2)
                 if new != r["text"] or eo != r["edge_o"]:
                     con.execute("UPDATE items SET text=?, edge_o=?, updated=? WHERE id=?",
                                 (new, eo, store.now(), r["id"]))
                     ni += 1
+            if dropped:
+                con.execute(f"DELETE FROM held WHERE type IN ({','.join('?'*len(dropped))})", dropped)
     finally:
         con.close()
     store.log("apply_privacy", sources=ns, items=ni)

@@ -151,7 +151,9 @@ def test_unknown_relation_word_no_guess(g):
     assert G.walk("who is Ravi's mentor", g, DICT) == []
     d2 = {"relations": {k: v for k, v in DICT["relations"].items() if k != "educated_at"},
           "aliases": DICT["aliases"]}
-    assert G.walk("where did my wife study", g, d2) == []
+    # leftover unknown words are ignored: the anchor and the known word still answer
+    r = G.walk("where did my wife study", g, d2)
+    assert r and r[0]["answer"] == "Asha"
     assert G.walk("hello there", g, DICT) == []
 
 
@@ -159,3 +161,103 @@ def test_mentions(g):
     m = G.mentions("who is Kabir's father", g, DICT)
     assert m["entities"] == ["Kabir"]
     assert ("parent_of", "in") in m["relations"]
+
+
+# ---- shape of the manager-written dictionary and graph (placeholder names)
+
+REAL_D = {
+    "relations": {
+        "child_of": {"inverse": "parent_of", "symmetric": False, "single": False,
+                     "words": ["parent", "father", "mother"],
+                     "inverse_words": ["child", "son", "daughter"]},
+        "parent_of": {"inverse": "child_of", "symmetric": False, "single": False,
+                      "words": ["child", "son", "daughter"],
+                      "inverse_words": ["parent", "father", "mother"]},
+        "born_in": {"inverse": None, "symmetric": False, "single": True,
+                    "words": ["birthplace"], "inverse_words": ["born"]},
+        "studied_at": {"inverse": None, "symmetric": False, "single": False,
+                       "words": ["school", "college", "university"], "inverse_words": ["student"]},
+        "sibling_of": {"inverse": None, "symmetric": True, "single": False,
+                       "words": ["sister", "brother", "sibling"],
+                       "inverse_words": ["sister", "brother", "sibling"]},
+        "owns": {"inverse": "owned_by", "symmetric": False, "single": False,
+                 "words": ["owns", "owner of"], "inverse_words": ["owned by"]},
+        "co_owns": {"inverse": "co_owned_by", "symmetric": False, "single": False,
+                    "words": ["team", "franchise", "company"], "inverse_words": ["co-owner"]},
+        "received": {"inverse": "awarded_to", "symmetric": False, "single": False,
+                     "words": ["award", "honour", "order"], "inverse_words": ["awarded to"]},
+    },
+    "aliases": {"Pine Co": "Pine Company"},
+}
+
+
+def e(s, rel, o):
+    return {"s": s, "rel": rel, "o": o, "fact": "f"}
+
+
+REAL_G = {"nodes": {n: {"aliases": [], "facts": []} for n in
+                    ["me", "Kian", "Kian Vale", "Mira", "Tobi", "Rhea Vale", "Oak Institute",
+                     "Pine Company", "Elm Team", "Grand Medal", "Order of Birch", "Old Harbour",
+                     "Nora", "Bay College", "Hill College"]},
+          "edges": [e("Tobi", "child_of", "me"), e("Kian", "child_of", "me"),
+                    e("Kian Vale", "child_of", "me"), e("Mira", "child_of", "me"),
+                    e("me", "child_of", "Nora"), e("me", "sibling_of", "Rhea Vale"),
+                    e("Pine Company", "owned_by", "me"), e("Elm Team", "co_owned_by", "me"),
+                    e("Kian", "studied_at", "Oak Institute"), e("me", "studied_at", "Bay College"),
+                    e("me", "studied_at", "Hill College"), e("me", "born_in", "Old Harbour"),
+                    e("Grand Medal", "awarded_to", "me"), e("Order of Birch", "awarded_to", "me")]}
+
+
+def rw(q):
+    return G.walk(q, REAL_G, REAL_D)
+
+
+def test_real_count_children_folds_bare_name():
+    r = rw("how many children do I have?")
+    assert r[0]["kind"] == "count" and r[0]["answer"] == "3"
+
+
+def test_real_children_set():
+    r = rw("who are my children?")
+    assert set(r[0]["answer"]) == {"Kian Vale", "Mira", "Tobi"}
+
+
+def test_real_siblings():
+    assert rw("how many siblings do I have?")[0]["answer"] == "1"
+
+
+def test_real_companies():
+    assert set(rw("which company do I own?")[0]["answer"]) == {"Pine Company", "Elm Team"}
+    assert rw("how many companies do I own?")[0]["answer"] == "2"
+
+
+def test_real_appositive_study():
+    assert rw("where did my son Kian study?")[0]["answer"] == "Oak Institute"
+
+
+def test_real_born():
+    assert rw("where was I born?")[0]["answer"] == "Old Harbour"
+
+
+def test_real_awards():
+    assert set(rw("what awards have I won?")[0]["answer"]) == {"Grand Medal", "Order of Birch"}
+
+
+def test_real_parents_and_no_relation_word():
+    assert rw("who is my mother")[0]["answer"] == "Nora"
+    assert rw("tell me about Kian") == []
+
+
+def test_inflection():
+    assert G._stem("children") == G._stem("child")
+    assert G._stem("companies") == G._stem("company")
+    assert G._stem("studied") == G._stem("study") == G._stem("studies")
+    assert G._stem("owned") == G._stem("owns") == G._stem("own")
+    assert G._stem("siblings") == G._stem("sibling")
+
+
+def test_router_real_shape():
+    for q in ("who are my children?", "where was I born?", "what awards have I won?",
+              "how many siblings do I have?"):
+        assert router.needs_graph(q, REAL_G, REAL_D), q
+    assert not router.needs_graph("what languages do I speak", REAL_G, REAL_D)

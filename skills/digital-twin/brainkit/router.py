@@ -17,4 +17,7 @@ def needs_graph(q: str, graph: dict, dictionary: dict) -> bool:
         return True
     # One relation word aimed at "me" ("what did I study") is plain search;
     # two or more chain across people and need the graph.
-    return sum(1 for i in items if i[0] == "R") >= 2
+    if sum(1 for i in items if i[0] == "R") >= 2:
+        return True
+    # A single relation word aimed at "me" goes to the graph when it has an answer.
+    return bool(G.walk(q, graph, dictionary))

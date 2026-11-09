@@ -30,17 +30,23 @@ def _tokens(text: str) -> list[str]:
     return re.findall(r"[^\W_]+", text)
 
 
+IRREGULAR = {"children": "child", "people": "person", "men": "man", "women": "woman",
+             "won": "win", "born": "bear", "wives": "wife"}
+_DROP_IN_NAMES = {"of", "at", "in", "by"}
+
+
 def _stem(w: str) -> str:
+    w = IRREGULAR.get(w, w)
     if len(w) <= 3:
         return w
     if w.endswith("ies") or w.endswith("ied"):
         return w[:-3] + "y"
+    if w.endswith("s") and not w.endswith("ss"):
+        w = w[:-1]
     if w.endswith("ing") and len(w) > 5:
         return w[:-3]
     if w.endswith("ed") and len(w) > 4:
         return w[:-2]
-    if w.endswith("s") and not w.endswith("ss"):
-        return w[:-1]
     return w
 
 
@@ -137,17 +143,29 @@ def _entity_index(graph: dict, dictionary: dict) -> dict:
 
 
 def _phrase_index(dictionary: dict) -> dict:
+    """stem tuple -> [(rel, dir)]. Words the dictionary states come first, in the
+    direction it states; words read off a relation's name (born_in -> "born") come
+    after, in both directions, so whichever direction has results wins."""
     idx = {}
-    for rel in sorted(dictionary.get("relations") or {}):
-        e = dictionary["relations"][rel]
+    rels = dictionary.get("relations") or {}
+
+    def add(phrase, cand):
+        toks = _tokens(phrase)
+        if not toks or PRONOUNS & set(toks):
+            return
+        lst = idx.setdefault(tuple(_stem(t) for t in toks), [])
+        if cand not in lst:
+            lst.append(cand)
+
+    for rel in sorted(rels):
         for key, d in (("words", "out"), ("inverse_words", "in")):
-            for w in e.get(key) or []:
-                toks = _tokens(w)
-                if not toks or PRONOUNS & set(toks):
-                    continue
-                lst = idx.setdefault(tuple(_stem(t) for t in toks), [])
-                if (rel, d) not in lst:
-                    lst.append((rel, d))
+            for w in rels[rel].get(key) or []:
+                add(w, (rel, d))
+    for rel in sorted(rels):
+        name = " ".join(t for t in rel.split("_") if t and t not in _DROP_IN_NAMES and len(t) > 2)
+        if name:
+            add(name, (rel, "out"))
+            add(name, (rel, "in"))
     return idx
 
 
@@ -173,7 +191,7 @@ def parse(q: str, graph: dict, dictionary: dict) -> dict:
             for n in range(min(maxlen, len(ts) - i), 0, -1):
                 e = ents.get(tuple(ts[i:i + n]))
                 r = phr.get(tuple(st[i:i + n]))
-                if e is not None:
+                if e is not None and not (r is not None and e.islower()):
                     hit = (n, ("E", e, None))
                     break
                 if r is not None:
@@ -260,6 +278,17 @@ def _path(graph, a, b):
     return None
 
 
+def _fold(values: list) -> list:
+    """A bare first name folds into the one longer name that starts with it."""
+    out = []
+    for v in values:
+        longer = [w for w in values if w != v and " " in w and " " not in v
+                  and w.split()[0].lower() == v.lower()]
+        if len(longer) != 1:
+            out.append(v)
+    return out
+
+
 def _label(rel: str) -> str:
     return rel.replace("_", " ")
 
@@ -285,27 +314,49 @@ def walk(q: str, graph: dict, dictionary: dict) -> list[dict]:
         return [{"kind": "path", "answer": nodes, "chain": edges,
                  "restated": f"{ents[0]} to {ents[1]}: {text}"}]
 
-    if p["leftover"] or len(ents) != 1:
+    if not any(i[0] == "R" for i in items) or not ents:
         return []
-    pending, post, seen_e = [], [], False
+    anchor, pending, post = None, [], []
     for it in items:
         if it[0] == "E":
-            seen_e = True
-        elif seen_e:
+            if anchor is None or it[1] == anchor:
+                anchor = it[1]
+            elif it[1] == SELF:
+                continue
+            else:  # a named entity replaces a pronoun or earlier name ("my son Aryan")
+                anchor, post = it[1], []
+        elif anchor is not None:
             post.append(it)
         else:
             pending.append(it)
-    if not pending and not post:
+    if anchor is None or not (pending or post):
         return []
 
-    values, chain, phrases = [ents[0]], [], []
     plan = [(it, "out") for it in post] + [(it, "in") for it in reversed(pending)]
+    values, chain, phrases = [anchor], [], []
+    ok = True
     for it, prefer in plan:
         values, used = _step(graph, dictionary, values, it[1], prefer)
         if not values:
-            return []
+            ok = False
+            break
         chain += [t for t in used if t not in chain]
         phrases.append(it[2])
+    if not ok:
+        # The composed reading found nothing ("which company do I own": two words
+        # naming one thing). Take what each relation word reaches on its own.
+        values, chain, phrases = [], [], []
+        for it, prefer in plan:
+            vs, used = _step(graph, dictionary, [anchor], it[1], prefer)
+            for v in vs:
+                if v not in values:
+                    values.append(v)
+            chain += [t for t in used if t not in chain]
+            if vs:
+                phrases.append(it[2])
+        if not values:
+            return []
+    values = _fold(values)
 
     kind_count = "how many" in joined
     who_else = "else" in toks
@@ -314,7 +365,7 @@ def walk(q: str, graph: dict, dictionary: dict) -> list[dict]:
         values = [v for v in values if v not in drop]
         if not values:
             return []
-    start = ents[0]
+    start = anchor
     body = "The " + " of the ".join(reversed(phrases)) + f" of {start}"
     if kind_count:
         return [{"kind": "count", "answer": str(len(values)), "chain": chain,

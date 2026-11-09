@@ -1,0 +1,1 @@
+{"mcpServers": {"twin-read": {"command": "../.venv/bin/python", "args": ["-m", "brainkit.mcp_read"], "env": {"PYTHONPATH": "..", "TWIN_HOME": "${TWIN_HOME:-~/.twin/brain}"}}}}

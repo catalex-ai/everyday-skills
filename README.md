@@ -11,6 +11,7 @@ it is allowed to touch.
 |---|---|---|
 | [Doctor Appointment](skills/doctor-appointment/README.md) | Two chat assistants for a clinic: a **Patient Assistant** that books, moves and cancels a patient's own appointments, and a **Doctor Assistant** that runs the day's schedule, blocks time and sets hours, either as set appointment times or as a number of patients per day. Bookings live in Google Calendar + Sheets or on your computer. | Works with two test patients (Patient A and B). Real-patient use is blocked until identity and OS-level isolation are verified. |
 | [Drive Detox](skills/drive-detox/README.md) | A read-only audit of a folder or Google Drive: biggest files, stale files, duplicate groups, and a cleanup plan you approve before anything moves. | Local folders work out of the box. Drive needs a `drive.readonly` token or your own MCP connection. |
+| [Digital Twin](skills/digital-twin/README.md) | A personal brain on your computer with two agents: a **Twin Manager** you talk to (it reads your CV or notes, splits them into facts, asks which audience may know which type of information) and a **Twin** that answers other people as you, only from what you allowed. | In development: hill-climbing on a public test corpus |
 
 ## Doctor Appointment
 

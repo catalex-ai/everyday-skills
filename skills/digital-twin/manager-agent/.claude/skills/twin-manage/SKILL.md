@@ -35,6 +35,10 @@ The owner gives you text, a file or a link. Read it yourself. Then:
    me." (work) and "Asha is my wife." (family). Otherwise a persona that may
    know about work but not family learns about the family through the work fact.
 
+   If `add_items` returns `mixed`, fix every listed fact right away with
+   `replace_item(old_id, [split facts])` before you move on. After a big import,
+   run `check_mixed` once and fix what it lists.
+
    **People and organisations close to the owner get their own facts.** For
    family, partners, close colleagues, co-founders and companies the owner is
    tied to, file what the material says about them (what they do, where they

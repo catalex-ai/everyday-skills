@@ -149,9 +149,11 @@ def main(argv: list[str]) -> int:
 
     # path: how am I connected to a person or thing two hops away
     done = set()
+    direct = {t["o"] for t in truth if t.get("hop") == 1}
     for t in two:
         v = vias.get(t["via"], {}).get(t["s"])
-        if not v or t["p"] not in PATH_P or t["o"] in done or len(done) >= 6:
+        # a target I am directly linked to is not a two-hop path question
+        if not v or t["p"] not in PATH_P or t["o"] in done or t["o"] in direct or len(done) >= 6:
             continue
         done.add(t["o"])
         cls = worst(v["cls"], t["cls"])

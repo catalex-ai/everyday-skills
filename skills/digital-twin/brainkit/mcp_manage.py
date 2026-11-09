@@ -84,6 +84,13 @@ def add_items(items: list[dict]) -> dict:
     """Add facts. Each item has text and category, and optionally about, edge {s, rel, o}, src, since, conf, by."""
     ids = raw.add_items(items)
     out = {"ids": ids, "waiting": []}
+    from . import lint
+    mixed = lint.mixed(ids)
+    if mixed:
+        out["mixed"] = mixed
+        out["fix"] = ("These facts name a relationship of another type. Split each with "
+                      "replace_item: keep the name, drop the relationship word, and add the "
+                      "relationship as its own fact in its own category.")
     try:
         from . import questions
         questions.sync()
@@ -91,6 +98,31 @@ def add_items(items: list[dict]) -> dict:
     except ImportError:
         pass
     return out
+
+
+@tool
+def replace_item(old_id: str, items: list[dict]) -> dict:
+    """Replace one fact with one or more corrected facts. The old fact is kept as superseded."""
+    ids = raw.add_items(items)
+    raw.set_status(old_id, "superseded")
+    out = {"ids": ids, "superseded": old_id}
+    try:
+        from . import questions
+        questions.sync()
+    except ImportError:
+        pass
+    from . import lint
+    still = lint.mixed(ids)
+    if still:
+        out["mixed"] = still
+    return out
+
+
+@tool
+def check_mixed() -> dict:
+    """List stored facts that mix a relationship of one type into a fact of another type."""
+    from . import lint
+    return {"mixed": lint.mixed()}
 
 
 @tool

@@ -13,7 +13,7 @@ COMMANDS = {
     "init": M.init, "status": M.status, "add-source": M.add_source, "add-items": M.add_items,
     "define-category": M.define_category, "define-relation": M.define_relation,
     "add-alias": M.add_alias, "create-persona": M.create_persona, "set-rule": M.set_rule,
-    "set-active": M.set_active, "set-privacy": M.set_privacy, "sync": M.sync,
+    "set-active": M.set_active, "set-privacy": M.set_privacy, "sync": M.sync, "replace-item": M.replace_item, "check-mixed": M.check_mixed,
     "next": M.next_questions, "next-questions": M.next_questions, "answer": M.answer,
     "record-correction": M.record_correction, "tidy": M.tidy, "audit": M.audit,
     "gate-scan": M.gate_scan, "list-items": M.list_items,

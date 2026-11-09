@@ -147,7 +147,7 @@ Server `twin-manage` (`python -m brainkit.mcp_manage`): `init`, `status`, `add_s
 `add_items(items)`, `define_category(slug, description)`, `define_relation(name, inverse, symmetric, single, words, inverse_words)`,
 `add_alias(alias, canonical)`, `create_persona(slug, audience, include, exclude)`, `set_rule(persona, category, decision)`,
 `set_active(slug)`, `set_privacy(type, mode)`, `sync`, `next_questions(n)`, `answer(question_id, text, decision, status)`,
-`record_correction(said, should, target, persona, payload)`, `tidy`, `audit`, `gate_scan(text)`, `list_items(category, status)`.
+`record_correction(said, should, target, persona, payload)`, `tidy`, `audit`, `gate_scan(text)`, `list_items(category, status)`, `replace_item(old_id, items)`, `check_mixed()`.
 
 Server `twin-read` (`python -m brainkit.mcp_read`): `brief()` (soul, voice and rules of the active persona),
 `search(q)`, `walk(q)`, `page(name)`, `profile()`. No other tools.

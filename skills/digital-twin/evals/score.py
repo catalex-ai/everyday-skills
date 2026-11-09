@@ -41,11 +41,22 @@ def _forms(alias: str) -> list[str]:
     return out
 
 
+def _fuzzy(t: str, a: str) -> bool:
+    """A name spelled slightly differently ("Shahnaz" for "Shehnaz"): every word of
+    the alias matches a word in the text at >= 0.8 similarity, for names of 5+ letters."""
+    import difflib
+    words = re.findall(r"\w+", t)
+    toks = a.split()
+    if not toks or any(len(x) < 5 for x in toks) or any(ch.isdigit() for ch in a):
+        return False
+    return all(any(difflib.SequenceMatcher(None, x, w).ratio() >= 0.8 for w in words) for x in toks)
+
+
 def has_any(text: str, aliases: list[str]) -> bool:
     t = fold(text)
     for al in aliases:
         for a in _forms(al):
-            if a and re.search(r"(?<!\w)" + re.escape(a) + r"(?!\w)", t):
+            if a and (re.search(r"(?<!\w)" + re.escape(a) + r"(?!\w)", t) or _fuzzy(t, a)):
                 return True
     return False
 

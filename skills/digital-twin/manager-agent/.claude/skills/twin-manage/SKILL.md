@@ -177,7 +177,7 @@ The owner says things like "you said X, it should be Y", "that is too formal", o
 | what is stored about contact or secrets | `privacy` |
 
 Show the change in one line ("I'll change 'I live in Pune' to 'I live in
-Mumbai'."), make it, then call `record_correction(said, should, target, persona,
+Leeds'."), make it, then call `record_correction(said, should, target, persona,
 payload)`. If it is not clear which persona, ask once.
 
 ## Tidy and audit

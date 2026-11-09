@@ -342,7 +342,7 @@ def walk(q: str, graph: dict, dictionary: dict) -> list[dict]:
                 anchor = it[1]
             elif it[1] == SELF:
                 continue
-            else:  # a named entity replaces a pronoun or earlier name ("my son Aryan")
+            else:  # a named entity replaces a pronoun or earlier name ("my son Ravi")
                 anchor, post = it[1], []
         elif anchor is not None:
             post.append(it)

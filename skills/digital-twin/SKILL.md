@@ -22,24 +22,27 @@ don't show them. Say what happened, not how.
    `PACKAGE`. Otherwise clone `https://github.com/catalex-ai/everyday-skills.git`
    to a temporary folder and copy `skills/digital-twin/` to the workspace as
    `digital-twin/`. Reuse an existing `digital-twin/`; never overwrite it.
-2. **Make the environment.** If `PACKAGE/.venv` is missing:
-   `python3 -m venv PACKAGE/.venv` then
-   `PACKAGE/.venv/bin/pip install -q -r PACKAGE/requirements.txt`.
-   It needs Python 3.11 or newer.
-3. **Start the brain.** The brain lives at `~/.twin/brain` unless the owner wants it
-   somewhere else (then use their folder as `TWIN_HOME`):
-   `cd PACKAGE && TWIN_HOME=~/.twin/brain .venv/bin/python -m brainkit.cli init`.
-   It is safe to run again. It is never inside the repo.
-4. **Check Claude Code:** `claude --version`. If it is missing, tell the owner in
+2. **Run the setup script:** `PACKAGE/setup.sh`. It is the only setup step. It
+   makes the Python environment, installs the pinned packages, fetches the
+   search model once and creates the brain at `~/.twin/brain`. If the owner wants
+   the brain elsewhere, run it as `TWIN_HOME=<their folder> PACKAGE/setup.sh`.
+   It is safe to run again. If it prints a problem (missing Python 3.11+, no
+   internet), tell the owner in one line and wait.
+3. **Check Claude Code:** `claude --version`. If it is missing, tell the owner in
    one line to install it, and wait.
-5. **Hand over the keys,** in a few lines:
-   - `./start-manager.sh` opens the Twin Manager. The owner talks to it to add
-     material, answer questions and fix mistakes.
-   - `./start-twin.sh` opens the Twin. Other people talk to it. It can only
-     read, and only the persona the manager has switched on.
+4. **Hand over,** in a few lines:
+   - In `PACKAGE/manager-agent`, run `claude`. That is the Twin Manager. The
+     owner talks to it to add material, answer questions and fix mistakes.
+   - In `PACKAGE/twin-agent`, run `claude`. That is the Twin. Other people talk
+     to it. It answers as the owner from the persona the manager switched on.
+   - Claude Code asks once to trust each folder; say yes.
    - First steps, in the manager: "Create a persona called Professional for
      people I work with", then "Add my CV" with a file or a link.
-6. End by asking if there is anything they would like to change.
+5. End by asking if there is anything they would like to change.
+
+Do not add permission limits, wrapper scripts or launch flags. Each agent folder
+already loads its own tools. Whatever hosts the agents decides what they may
+use.
 
 ## Never
 

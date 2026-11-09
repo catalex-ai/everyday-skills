@@ -53,15 +53,27 @@ Give your coding assistant this prompt:
 > Read https://raw.githubusercontent.com/catalex-ai/everyday-skills/main/skills/digital-twin/SKILL.md
 > and set up the Digital Twin here.
 
-Or by hand:
+Or by hand, one script:
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-TWIN_HOME=~/.twin/brain .venv/bin/python -m brainkit.cli init
-./start-manager.sh      # you
-./start-twin.sh         # other people
+./setup.sh                       # brain in ~/.twin/brain
+TWIN_HOME=~/my-brain ./setup.sh  # or somewhere else
 ```
+
+It needs Python 3.11+ and makes a `.venv` here, installs three pinned packages
+(`mcp`, `model2vec`, `PyYAML`), fetches a small search model once, and creates
+the brain. It is safe to run again. Then run Claude Code normally:
+
+```bash
+cd manager-agent && claude   # you: the Twin Manager
+cd twin-agent && claude      # other people: the Twin
+```
+
+Each folder loads its own tools from `.mcp.json` and pre-approves them in
+`.claude/settings.json`. Claude Code asks you once to trust each folder. The
+package adds no restrictions of its own: whatever hosts the agents (for example
+a relay app) decides which tools each one may use. If you set `TWIN_HOME`, use
+the same value when you start Claude.
 
 ## Things to say to the manager
 
@@ -79,7 +91,9 @@ conflicts. It never shows held values.
 
 ## Files
 
-- [SKILL.md](SKILL.md): setup
+- [SKILL.md](SKILL.md): setup steps for a coding assistant
+- [setup.sh](setup.sh): the one setup script
+- [evals/REPORT.md](evals/REPORT.md): hill-climb results
 - [PRIVACY.md](PRIVACY.md): what is stored where
 - [TESTING.md](TESTING.md): tests and evals
 - `manager-agent/`, `twin-agent/`: the two agents

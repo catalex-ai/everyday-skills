@@ -233,7 +233,7 @@ re-run, keep it only if no metric regresses and PII stays 0. Log each round in
 `evals/REPORT.md` without naming the subject.
 
 Models: configurable. In evals the manager runs via `claude -p` (default
-sonnet) and the twin via `claude -p` with only the read MCP tools (default
+haiku) and the twin via `claude -p` with only the read MCP tools (default
 haiku).
 
 ## My calls (to check)

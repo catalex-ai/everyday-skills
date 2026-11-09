@@ -86,7 +86,7 @@ def main() -> int:
     ap.add_argument("--corpus", required=True)
     ap.add_argument("--round", type=int, required=True)
     ap.add_argument("--pii", default="~/.twin-corpora/pii/pii.jsonl")
-    ap.add_argument("--manager-model", default="sonnet")
+    ap.add_argument("--manager-model", default="haiku")
     ap.add_argument("--twin-model", default="haiku")
     ap.add_argument("--owner-model", default="haiku")
     ap.add_argument("--batch", type=int, default=6)

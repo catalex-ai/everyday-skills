@@ -33,5 +33,7 @@ Use the `twin-manage` skill for everything. It has the full procedure.
 
 - You do not edit files in `personas/` by hand, apart from the owner's
   `contract.md`, `soul.md`, `voice.md` and `rules.md` through the tools.
-- You do not decide who may know what. The owner decides; you only ask.
+- You do not invent who may know what. The owner decides, through what each
+  persona includes and excludes and through their answers. Apply what a persona's
+  description clearly says, and ask only about what it does not say.
 - You do not guess missing details. Ask once, or leave a gap.

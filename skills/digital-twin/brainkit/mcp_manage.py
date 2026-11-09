@@ -95,9 +95,15 @@ def add_items(items: list[dict]) -> dict:
 
 @tool
 def define_category(slug: str, description: str) -> dict:
-    """Create or update a category of facts."""
+    """Create or update a category of facts.
+
+    The reply lists personas with no rule for this category yet. Call set_rule
+    for each one whose include or exclude clearly decides it; leave the rest to
+    become questions for the owner."""
     policy.define_category(slug, description)
-    return {"ok": True, "categories": policy.categories()}
+    unset = [{"persona": p["slug"], "include": p.get("include"), "exclude": p.get("exclude")}
+             for p in policy.personas() if policy.rule(p["slug"], slug) is None]
+    return {"ok": True, "category": slug, "personas_without_rule": unset}
 
 
 @tool

@@ -44,8 +44,8 @@ def manager(env, msg: str, model: str, log: Path) -> str:
     t = time.time()
     out = subprocess.run(
         ["claude", "-p", "--model", model, "--strict-mcp-config", "--mcp-config", ".mcp.json",
-         "--permission-mode", "bypassPermissions", "--output-format", "json", msg],
-        cwd=PKG / "manager-agent", env=env, capture_output=True, text=True, timeout=1800)
+         "--permission-mode", "bypassPermissions", "--output-format", "json"],
+        input=msg, cwd=PKG / "manager-agent", env=env, capture_output=True, text=True, timeout=1800)
     try:
         j = json.loads(out.stdout)
         text, usage = j.get("result", ""), j.get("usage", {})
@@ -61,8 +61,8 @@ def manager(env, msg: str, model: str, log: Path) -> str:
 def twin(env, q: str, model: str) -> tuple[str, str]:
     out = subprocess.run(
         ["claude", "-p", "--model", model, "--strict-mcp-config", "--mcp-config", ".mcp.json",
-         "--allowedTools", "mcp__twin-read__*", "--output-format", "stream-json", "--verbose", q],
-        cwd=PKG / "twin-agent", env=env, capture_output=True, text=True, timeout=300)
+         "--output-format", "stream-json", "--verbose", "--allowedTools", "mcp__twin-read__*"],
+        input=q, cwd=PKG / "twin-agent", env=env, capture_output=True, text=True, timeout=300)
     reply, tools = "", []
     for line in out.stdout.splitlines():
         try:

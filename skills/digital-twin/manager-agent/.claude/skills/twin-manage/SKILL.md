@@ -38,6 +38,11 @@ The owner gives you text, a file or a link. Read it yourself. Then:
      fact into the closest one.
    - Never name a category after a person, a company or one fact.
    - New category: `define_category(slug, description)` before you use it.
+     The reply lists every persona that has no rule for it yet, with that
+     persona's include and exclude. **Right away**, call `set_rule` for each
+     persona whose include or exclude clearly decides the new category. The
+     owner already decided when they described the persona. Leave it unset
+     only when the contract truly does not say, so that it becomes a question.
 3. **Add edges** for every relationship between named things. An edge is
    `(subject, relation, object)`: `{"s":"me","rel":"works_at","o":"Northwind Ltd"}`.
    Names are information. People, companies and places are stored as entities.

@@ -33,8 +33,8 @@ def ask_model(prompt: str, model: str, cwd: Path) -> str:
     out = subprocess.run(
         ["claude", "-p", "--model", model, "--strict-mcp-config",
          "--mcp-config", '{"mcpServers":{}}', "--disallowedTools",
-         "Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,Task", prompt],
-        cwd=cwd, capture_output=True, text=True, timeout=180)
+         "Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,Task"],
+        input=prompt, cwd=cwd, capture_output=True, text=True, timeout=180)
     return out.stdout.strip()
 
 

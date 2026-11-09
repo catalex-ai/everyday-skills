@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -58,7 +59,27 @@ def manager(env, msg: str, model: str, log: Path) -> str:
     return text
 
 
+_KEEP = [("Tell me about", "\x01"), ("Remind me of", "\x02"), ("Tell me", "\x03"),
+         ("I would like", "\x04"), ("I want", "\x05"), ("I need", "\x06")]
+_SECOND = [(r"\bam I\b", "are you"), (r"\bI am\b", "you are"), (r"\bI'm\b", "you're"),
+           (r"\bI was\b", "you were"), (r"\bwas I\b", "were you"), (r"\bI\b", "you"),
+           (r"\bmyself\b", "yourself"), (r"\bmine\b", "yours"), (r"\bmy\b", "your"),
+           (r"\bme\b", "you")]
+
+
+def second_person(q: str) -> str:
+    """Others talk to the twin, so they say "your", not "my"."""
+    for k, v in _KEEP:
+        q = re.sub(r"\b" + k + r"\b", v, q, flags=re.I)
+    for pat, rep in _SECOND:
+        q = re.sub(pat, rep, q, flags=0 if pat == r"\bI\b" else re.I)
+    for k, v in _KEEP:
+        q = q.replace(v, "Tell me" if k == "Remind me of" else k)
+    return q[:1].upper() + q[1:]
+
+
 def twin(env, q: str, model: str) -> tuple[str, str]:
+    q = second_person(q)
     out = subprocess.run(
         ["claude", "-p", "--model", model, "--strict-mcp-config", "--mcp-config", ".mcp.json",
          "--output-format", "stream-json", "--verbose", "--allowedTools", "mcp__twin-read__*"],

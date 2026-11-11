@@ -13,16 +13,21 @@ def configured_patient(folder=ROOT/'patient-agent'):
     args=json.loads((folder/'.mcp.json').read_text())['mcpServers']['clinic']['args']
     return args[args.index('--patient')+1] if '--patient' in args else 'patient-a'
 
-def banner(patient,log=None):
+def configured_details(folder=ROOT/'patient-agent'):
+    from core import parse_patient_details
+    args=json.loads((folder/'.mcp.json').read_text())['mcpServers']['clinic']['args']
+    return parse_patient_details(args[args.index('--patient-details')+1]) if '--patient-details' in args else {}
+
+def banner(patient,log=None,details=None):
     """Sentences for changes not told yet; the runtime records them as told."""
     from server import make_runtime
-    runtime=make_runtime('patient',patient)
+    runtime=make_runtime('patient',patient,details)
     if log is not None:runtime.service.notices_seen=log
     return runtime.call('get_my_appointments',{}).get('tell_patient_first',[])
 
 if __name__=='__main__':
     from runtime_python import ensure_package_interpreter
     ensure_package_interpreter(ROOT)
-    try:lines=banner(configured_patient())
+    try:lines=banner(configured_patient(),details=configured_details())
     except Exception:lines=[]
     if lines:print('\n'.join(['','  Message from the clinic:',*('  - '+x for x in lines),'']))

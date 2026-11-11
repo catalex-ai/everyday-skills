@@ -3,6 +3,7 @@ import sys,unittest,unittest.mock
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from core import DEFAULT,Service,Identity,clinic_change
+from named_service import Service
 from mock import MockCalendar,MockSheets,fixture,free_demo_day
 
 class ClinicChangeTests(unittest.TestCase):
@@ -68,7 +69,7 @@ class ClinicChangeTests(unittest.TestCase):
         self.confirmed(self.doctor,'doctor_cancel_appointment',{'appointment_id':ident})
         patient=self.patient
         class Runtime:
-            def __init__(rt,role,name):rt.service=patient
+            def __init__(rt,role,name,details=None):rt.service=patient
             def call(rt,name,args):return patient.call(name,args)
         with tempfile.TemporaryDirectory() as d,unittest.mock.patch.object(server,'make_runtime',Runtime):
             log=NoticeLog(Path(d)/'seen.json')

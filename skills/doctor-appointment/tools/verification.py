@@ -16,6 +16,7 @@ def verify_google(calendar,sheets,config,start,approver,log=print):
     owner='synthetic-verification-'+secrets.token_hex(8)
     patient=Service(Identity(owner,'patient',config['clinic_id'],'synthetic',True),calendar,sheets,config,approver=approver)
     doctor=Service(Identity('verification-doctor','doctor',config['clinic_id'],'synthetic',True),calendar,sheets,config,approver=approver)
+    patient.patients.set_name(owner,'Synthetic Verification')  # a booking needs a name
     other=Service(Identity('synthetic-other','patient',config['clinic_id'],'synthetic',True),calendar,sheets,config)
     req='verification-'+secrets.token_hex(12)
     event_id=hashlib.sha256(f'{config["clinic_id"]}:{owner}:{req}'.encode()).hexdigest()

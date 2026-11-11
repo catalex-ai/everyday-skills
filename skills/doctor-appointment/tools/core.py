@@ -43,12 +43,13 @@ class Identity:
 
 PATIENT = {'get_available_slots','get_my_appointments','book_my_appointment',
            'cancel_my_appointment','reschedule_my_appointment','get_clinic_information',
-           'get_my_details','set_my_name'}
+           'get_my_details','get_my_name','set_my_name'}
 DOCTOR = {'doctor_get_schedule','doctor_get_appointment','doctor_configure_clinic',
           'doctor_block_time','doctor_unblock_time','doctor_cancel_appointment',
           'doctor_reschedule_appointment','doctor_sync_register','doctor_sync_status',
           'doctor_review_issues','doctor_open_spreadsheet','doctor_connection_status','doctor_verify_synthetic_appointment','doctor_book_appointment',
-          'doctor_get_clinic_settings','doctor_mark_no_show'}
+          'doctor_get_clinic_settings','doctor_mark_no_show',
+          'doctor_list_bookings','doctor_get_patient','doctor_find_patients'}
 
 DEFAULT = dict(clinic_id='synthetic-clinic', clinic_name='Practice Clinic', timezone='Asia/Kolkata',
     working_days=[0,1,2,3,4,5], opening='09:00', closing='17:00', breaks=[['13:00','14:00']],
@@ -73,6 +74,8 @@ DEFAULT = dict(clinic_id='synthetic-clinic', clinic_name='Practice Clinic', time
     # how busy the doctor is; each check shows at most PATIENT_SLOTS times.
     daily_lookup_limit=15)
 PATIENT_SLOTS=3
+LIST_DAYS_MAX=31  # longest range doctor_list_bookings answers
+LIST_PATIENTS_MAX=50
 CATEGORIES=('consultation','follow_up')
 TOTAL='total'  # one shared cap for every kind of visit
 COUNT_FIELDS=('booking_mode','daily_caps','day_caps','queue_minutes','booking_window_days','weekly_booking_limit','no_show_limit','cancel_cutoff_hours','daily_lookup_limit')  # added after first release
@@ -238,18 +241,63 @@ class PatientDirectory:
     def set_name(self,subject,name):
         def put(data):data[subject]=(data.get(subject) if isinstance(data.get(subject),dict) else {})|{'name':name}
         self._update(put)
+    def set_details(self,subject,details):
+        """Store the launcher's details (phone, email, short_name, name as profile_name)
+        on this patient's own record, updating them when they change. Never touches
+        `name`, which only the patient gives."""
+        if not valid_patient(subject) or not details:return
+        wanted={('profile_name' if k=='name' else k):v for k,v in details.items()}
+        if all(self.get(subject).get(k)==v for k,v in wanted.items()) and isinstance(self._load().get(subject),dict):return
+        def put(data):
+            record=data.get(subject) if isinstance(data.get(subject),dict) else {}
+            data[subject]=record|wanted
+        self._update(put)
+    def subjects(self):
+        """Every known patient reference (doctor role only)."""
+        return sorted(k for k,v in self._load().items() if valid_patient(k) and isinstance(v,dict))
 
 def clean_name(value):
     name=' '.join(value.split()) if isinstance(value,str) else ''
     if not name or len(name)>NAME_MAX or any(not ch.isprintable() for ch in name):raise ValueError(f'Give a name of 1 to {NAME_MAX} characters')
     return name
 
+DETAIL_MEMBERS=('short_name','name','phone','email')
+PHONE_E164=r'\+[1-9][0-9]{6,14}'
+EMAIL_SHAPE=r'[^@\s]{1,64}@[^@\s]{1,255}\.[^@\s]{2,63}'
+def parse_patient_details(text):
+    """The launcher's optional --patient-details JSON: an object whose members are all
+    optional. Unknown members are ignored, null counts as absent. Raises ValueError
+    with a plain reason for anything malformed; called at start-up, never mid-session."""
+    if text is None:return {}
+    try:data=json.loads(text)
+    except (TypeError,ValueError):raise ValueError('patient details must be a JSON object') from None
+    if not isinstance(data,dict):raise ValueError('patient details must be a JSON object')
+    out={}
+    for key in DETAIL_MEMBERS:
+        value=data.get(key)
+        if value is None:continue
+        if not isinstance(value,str):raise ValueError(f'patient details {key} must be a string')
+        value=' '.join(value.split()) if key in ('short_name','name') else value.strip()
+        if key in ('short_name','name'):
+            try:value=clean_name(value)
+            except ValueError:raise ValueError(f'patient details {key} must be 1 to {NAME_MAX} printable characters') from None
+        elif key=='phone' and not re.fullmatch(PHONE_E164,value):raise ValueError('patient details phone must be E.164, like +14155550123')
+        elif key=='email' and (len(value)>254 or not re.fullmatch(EMAIL_SHAPE,value)):raise ValueError('patient details email is not a valid address')
+        out[key]=value
+    return out
+
+def doctor_patient_record(subject,patients):
+    """What the doctor sees of one patient: reference, the name they gave, contact details."""
+    record=patients.get(subject);out={'patient_reference':subject}
+    for key,field in (('name','patient_name'),('phone','patient_phone'),('email','patient_email'),('short_name','patient_short_name')):
+        if isinstance(record.get(key),str) and record[key]:out[field]=record[key]
+    return out
+
 def doctor_event(e,patients=None):
     result=public_event(e)
     if e.get("kind")=="appointment" and e.get("owner"):
         result["patient_reference"]=e["owner"]
-        record=patients.get(e["owner"]) if patients is not None else {}
-        if isinstance(record.get("name"),str) and record["name"]:result["patient_name"]=record["name"]
+        if patients is not None:result|=doctor_patient_record(e["owner"],patients)
     return result
 
 def version_of(e):
@@ -274,6 +322,7 @@ class Service:
         self.lookups = None  # LookupLog in running sessions: patients' daily availability checks
         self.patients = PatientDirectory()  # a file shared by both assistants in running sessions
         self.patient_seen = False
+        self.details = {}  # the launcher's parse_patient_details() result for this session's patient
     def doctor_view(self,e):return doctor_event(e,self.patients)
     def authorize(self, tool):
         i = self.identity
@@ -594,6 +643,10 @@ class Service:
     def call(self,tool,args):
         if self.identity.role=='patient' and not self.patient_seen:
             self.patients.ensure(self.identity.subject);self.patient_seen=True  # the patient's record, made on first use
+            self.patients.set_details(self.identity.subject,self.details)
+        if self.identity.role=='patient' and tool=='book_my_appointment':
+            refused=self.name_required()
+            if refused:return refused
         if self.identity.role=='patient' and self.lookups is not None and isinstance(args,dict) and (
                 tool=='get_available_slots' or (tool in ('book_my_appointment','reschedule_my_appointment') and 'confirmation_token' not in args)):
             today=datetime.now(ZoneInfo(self.config['timezone'])).date().isoformat()
@@ -625,6 +678,17 @@ class Service:
             check=self.attendance_check()
             if check:result=result|{'ask_doctor_about_attendance':check}
         return result
+    def my_name(self):
+        name=self.patients.get(self.identity.subject).get('name')
+        return name if isinstance(name,str) and name else None
+    def name_required(self):
+        """A booking never exists without the patient's name: refuse until it is saved."""
+        if self.my_name():return None
+        return {'conflict':True,'name_required':True,'code':'NAME_REQUIRED','suggested_name':self.suggested_name(),
+                'reason':'The patient has not given a name yet. Ask for their name, save it with set_my_name, then book.'}
+    def suggested_name(self):
+        record=self.patients.get(self.identity.subject)
+        return next((record[k] for k in ('short_name','profile_name') if isinstance(record.get(k),str) and record[k]),None)
     def attendance_check(self):
         """Once per finished clinic day (last 7 days): the appointments still marked as
         attended, so the doctor can say who didn't come. Recorded as asked once shown."""
@@ -663,12 +727,11 @@ class Service:
             if 'enum' in schemas['properties'][k] and v not in schemas['properties'][k]['enum']:raise ValueError('Unknown configured patient')
         if tool=='get_available_slots':return self.slots(args['day'],args.get('preferred_start'))
         if tool=='get_my_appointments':return {'appointments':[patient_event(e,self.config['timezone']) for e in self.cal.owned_events(self.identity.clinic,self.identity.subject)]}
-        if tool=='book_my_appointment':return self.book(**args)
+        if tool=='book_my_appointment':return self.name_required() or self.book(**args)
         if tool=='cancel_my_appointment':return self.change('cancel',args['appointment_id'],token=args.get('confirmation_token'))
         if tool=='reschedule_my_appointment':return self.change('reschedule',args['appointment_id'],args['start'],args.get('confirmation_token'))
-        if tool=='get_my_details':
-            name=self.patients.get(self.identity.subject).get('name')
-            return {'name':name if isinstance(name,str) and name else None}
+        if tool in ('get_my_details','get_my_name'):
+            name=self.my_name();return {'name':name}|({'suggested_name':self.suggested_name()} if name is None and self.suggested_name() else {})
         if tool=='set_my_name':
             name=clean_name(args['name']);self.patients.set_name(self.identity.subject,name);return {'saved':True,'name':name}
         if tool in ('get_clinic_information','doctor_get_clinic_settings'):
@@ -692,6 +755,22 @@ class Service:
             if self.count_mode():result['places']=self.places(day)
             return result
         if tool=='doctor_get_appointment':return self.doctor_view(self.managed(args['appointment_id']))
+        if tool=='doctor_list_bookings':
+            first=date.fromisoformat(args['start_day']);last=date.fromisoformat(args.get('end_day',args['start_day']));z=ZoneInfo(self.config['timezone'])
+            if last<first or (last-first).days>=LIST_DAYS_MAX:raise ValueError(f'Give a date range of 1 to {LIST_DAYS_MAX} days')
+            found=[e for e in self.cal.schedule(datetime.combine(first,time(),z),datetime.combine(last,time(),z)+timedelta(days=1)) if e.get('kind')=='appointment']
+            return {'start_day':first.isoformat(),'end_day':last.isoformat(),'bookings':[self.doctor_view(e) for e in sorted(found,key=lambda e:e['start'])]}
+        if tool=='doctor_get_patient':
+            ref=args['patient_reference']
+            if not (self.patients.known(ref) or (valid_patient(ref) and self.cal.owned_events(self.identity.clinic,ref))):raise ValueError('Unknown patient; use a patient_reference from the schedule')
+            return {'patient':doctor_patient_record(ref,self.patients),'appointments':[self.doctor_view(e) for e in sorted(self.cal.owned_events(self.identity.clinic,ref),key=lambda e:e.get('start',''))
+                    if e.get('kind')=='appointment']}
+        if tool=='doctor_find_patients':
+            needle=' '.join(args['query'].lower().split())
+            if not needle:raise ValueError('Give part of a name, phone number or email')
+            refs=set(self.patients.subjects())|{e['owner'] for e in self.cal.managed_events(self.identity.clinic) if e.get('kind')=='appointment' and valid_patient(e.get('owner'))}
+            hits=[r for r in sorted(refs) if any(needle in str(v).lower() for v in doctor_patient_record(r,self.patients).values())]
+            return {'patients':[doctor_patient_record(r,self.patients) for r in hits[:LIST_PATIENTS_MAX]],'truncated':len(hits)>LIST_PATIENTS_MAX}
         if tool=='doctor_configure_clinic':
             patch=args['changes']
             if set(patch)-set(DEFAULT) or set(patch)&SETUP_ONLY:raise ValueError('Unknown or immutable field')
@@ -739,6 +818,7 @@ class Service:
             patient=Service(Identity('patient-a','patient','synthetic-clinic','synthetic',True),calendar,sheets,state['config'])
             other=Service(Identity('patient-b','patient','synthetic-clinic','synthetic',True),calendar,sheets,state['config'])
             doctor=Service(Identity('synthetic-doctor','doctor','synthetic-clinic','synthetic',True),calendar,sheets,state['config'])
+            patient.patients.set_name('patient-a','Patient A')  # a booking needs a name
             slot=patient.slots(day)['slots'][0]
             args={'start':slot,'request_id':'synthetic-verification'}
             draft=patient.call('book_my_appointment',args)
@@ -783,9 +863,13 @@ ARGUMENTS={
  'cancel_my_appointment':schema({'appointment_id':'string','confirmation_token':'string'},['appointment_id']),
  'reschedule_my_appointment':schema({'appointment_id':'string','start':'string','confirmation_token':'string'},['appointment_id','start']),
  'get_my_details':schema(),
+ 'get_my_name':schema(),
  'set_my_name':schema({'name':{'type':'string','description':'The name the patient goes by, 1 to 80 characters.'}},['name']),
  'doctor_book_appointment':schema({'patient_reference':{'type':'string','description':'patient_reference from the schedule, or patient-a / patient-b.'},'start':'string','request_id':'string','confirmation_token':'string','category':{'type':'string','enum':list(CATEGORIES)},'allow_over_cap':{'type':'boolean','description':'Count mode: book even though the day is full. Only after the doctor explicitly agrees.'}},['patient_reference','start','request_id']),
  'doctor_get_schedule':schema({'day':'string'},['day']),
+ 'doctor_list_bookings':schema({'start_day':{'type':'string','description':'First day, YYYY-MM-DD (clinic time).'},'end_day':{'type':'string','description':'Last day, YYYY-MM-DD; omit for one day. At most 31 days.'}},['start_day']),
+ 'doctor_get_patient':schema({'patient_reference':{'type':'string','description':'patient_reference from the schedule or a booking list.'}},['patient_reference']),
+ 'doctor_find_patients':schema({'query':{'type':'string','description':'Part of a name, phone number or email.'}},['query']),
  'doctor_get_appointment':schema({'appointment_id':'string'},['appointment_id']),
  'doctor_configure_clinic':schema({'changes':CONFIG_CHANGES,'confirmation_token':'string'},['changes']),
  'doctor_mark_no_show':schema({'appointment_id':'string','no_show':{'type':'boolean','description':'true marks a missed appointment; false clears the mark.'},'confirmation_token':'string'},['appointment_id']),

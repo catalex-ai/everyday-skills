@@ -14,7 +14,17 @@ would be unsafe. Availability uses busy intervals without event details.
 Patients and the doctor are synthetic test identities selected outside chat by
 native MCP configuration: one patient per session, picked by the launcher with
 `--patient ID` (any `[A-Za-z0-9_-]{1,128}` ID; Patient A/B are the demo
-defaults). They cannot authorize real patient data. Doctor-side booking accepts
+defaults). The launcher can also pass `--patient-details JSON` (optional
+`short_name`, `name`, `phone` in E.164 and `email`; unknown members are ignored,
+malformed input stops the session at start-up); those details are stored on that
+patient's own record when the session starts. Every patient tool reads and writes
+only the session's patient: no tool or argument takes a patient ID, phone, email
+or name, and `tests/test_patients.py` proves one session cannot read or change
+another patient's record or bookings. A booking is refused with `NAME_REQUIRED`
+until the patient has given a name. The doctor role alone has the elevated tools
+`doctor_list_bookings`, `doctor_get_patient` and `doctor_find_patients`; the
+patient role's tool guard, Claude allow list and Codex tool list exclude them.
+They cannot authorize real patient data. Doctor-side booking accepts
 only a patient the clinic already knows (a demo patient, one who has used the
 Patient Assistant, or one with bookings); a model-supplied unknown patient
 identity is rejected. Future live identity needs the broker in GATEWAY.md.
@@ -126,4 +136,7 @@ patient reference after doctor authorization, so the model can resolve patient
 requests without guessing, plus `patient_name` when the patient gave one
 (`set_my_name`, kept in `config/patients.json`). Patient outputs omit references
 and ownership fields.
-Neither output includes contact details or raw descriptions.
+The doctor tools `doctor_list_bookings`, `doctor_get_patient` and
+`doctor_find_patients` also return the patient's phone and email when the launcher
+supplied them. Neither output includes raw event descriptions. Patient outputs
+never include contact details of anyone.

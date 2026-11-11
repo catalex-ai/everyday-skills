@@ -53,6 +53,7 @@ class PatientTests(unittest.TestCase):
         first=s.call(tool,args);self.assertTrue(first.get('confirmation_required'),first)
         return first,s.call(tool,args|{'confirmation_token':first['confirmation_token']})
     def book(self,s,hour='14:00',request='patient-book-1'):
+        if not s.patients.get(s.identity.subject).get('name'):s.patients.set_name(s.identity.subject,'Test '+s.identity.subject)  # booking needs a name
         return self.confirm(s,'book_my_appointment',{'start':self.at(hour),'request_id':request})[1]['appointment']['id']
 
     def test_patients_stay_isolated(self):
@@ -81,7 +82,7 @@ class PatientTests(unittest.TestCase):
 
     def test_doctor_results_name_the_patient(self):
         self.p1.call('set_my_name',{'name':'Asha Rao'})
-        named=self.book(self.p1);unnamed=self.book(self.a,hour='15:20',request='patient-book-2')
+        named=self.book(self.p1);unnamed=self.confirm(self.doc,'doctor_book_appointment',{'patient_reference':'patient-a','start':self.at('15:20'),'request_id':'doctor-book-9'})[1]['appointment']['id']
         schedule={e['id']:e for e in self.doc.call('doctor_get_schedule',{'day':self.day})['appointments']}
         cases=[
             ('schedule, named patient',schedule[named],P1,'Asha Rao'),

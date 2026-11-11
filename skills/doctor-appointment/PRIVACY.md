@@ -1,14 +1,18 @@
 # Privacy
 
 Use synthetic data only. This package is not approved for real patient records.
-Do not enter diagnoses, medical history, patient contacts or real appointment IDs.
+Do not enter diagnoses or medical history. The launcher may pass a patient's
+phone and email with their ID; the package stores them only on that patient's
+record and shows them only to the Doctor Assistant.
 Only scheduling metadata is needed. Patient responses have appointment ID,
 start/end, status and kind. Clinic contact/address is configurable administrative
 information, not patient contact data.
 
-Each patient's record (the name they give the Patient Assistant) is kept in
-`config/patients.json` on this computer. Only the Doctor Assistant sees names;
-they never go to the calendar or the spreadsheet.
+Each patient's record (the name they give the Patient Assistant, plus any
+`short_name`, `phone` and `email` the launcher passed with `--patient-details`) is
+kept in `config/patients.json` on this computer. The Patient Assistant sees only
+its own patient's name; only the Doctor Assistant sees names, phones and emails
+across patients. They never go to the calendar or the spreadsheet.
 
 Practice state is local mock adapter storage under `config/practice-state.json`;
 it is not a separate live appointment database. Google Calendar is the intended

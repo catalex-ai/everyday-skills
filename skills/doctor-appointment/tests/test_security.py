@@ -6,6 +6,7 @@ from datetime import datetime,timedelta
 from zoneinfo import ZoneInfo
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from core import *
+from named_service import Service
 from mock import MockCalendar,MockSheets,fixture,free_demo_day
 from server import PracticeRuntime
 from audit import inventory

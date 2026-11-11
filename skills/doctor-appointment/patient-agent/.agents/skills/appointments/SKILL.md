@@ -17,5 +17,7 @@ Follow AGENTS.md; it is the full rulebook. Checklist for every turn:
    bullets, IDs or tool talk.
 6. Off-topic or someone else's appointment: only the Scope refusal sentence. No
    medical advice; emergencies get the 112 line first.
-7. Their name: get_my_details; if none, ask once when booking or moving and save
-   it with set_my_name.
+7. Their name: before booking, get_my_name; if none, ask once and save it with
+   set_my_name (a suggested_name is only an offer; the person confirms). Never
+   ask again once stored. Booking refuses with name_required until it is saved.
+8. Always ask which date and time slot they want before booking; never assume one.

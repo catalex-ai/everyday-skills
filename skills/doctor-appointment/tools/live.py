@@ -109,7 +109,7 @@ def google_clients(c):
 
 class LiveRuntime:
     """Same role/identity surface as PracticeRuntime, backed by Google."""
-    def __init__(self, role, patient='patient-a', approver=None):
+    def __init__(self, role, patient='patient-a', approver=None, details=None):
         if role not in ('patient', 'doctor') or not valid_patient(patient): raise ValueError('Invalid patient identity')
         state = live_state()
         if not state['active']: raise PermissionError('Live Google mode unavailable: ' + state['reason'])
@@ -125,6 +125,7 @@ class LiveRuntime:
         self.service.alerts = AlertLog(ROOT/'config'/'doctor-alerts.json')
         self.service.lookups = LookupLog(ROOT/'config'/'lookups.json')
         self.service.patients = PatientDirectory(ROOT/'config'/'patients.json')
+        self.service.details = dict(details or {})
     def tools(self):
         from core import PATIENT, DOCTOR
         return sorted(PATIENT if self.role == 'patient' else DOCTOR)

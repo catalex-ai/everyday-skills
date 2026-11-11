@@ -271,6 +271,21 @@ CODEX_HOME="$PWD/.codex" codex --no-daemon --strict-config --dangerously-bypass-
 
 This explicit local test identity is not authentication for live patients.
 
+A launcher that knows more about the person can add `--patient-details` with a
+JSON object; every member is optional, unknown members are ignored and malformed
+JSON stops the session at start-up with an explanation:
+
+```sh
+python3 ../tools/server.py --role patient --patient "ID" --patient-details '{"short_name":"Asha","name":"Asha Rao","phone":"+14155550123","email":"asha@example.com"}'
+```
+
+The details are stored on that patient's own record when the session starts.
+The patient's name is still the one they give in chat: the assistant asks for it
+before the first booking (offering `short_name` as a suggestion) and booking is
+refused until it is saved. The doctor assistant lists every booking in a date
+range with each patient's name, phone and email (`doctor_list_bookings`) and
+looks up patients (`doctor_get_patient`, `doctor_find_patients`).
+
 ## Claude Code: the same two folders
 
 In either role folder, run this native command:

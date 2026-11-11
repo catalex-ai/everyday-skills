@@ -5,6 +5,7 @@ from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import live,server
 from core import DEFAULT,Service,Identity,Denied,ARGUMENTS
+from named_service import Service
 from mock import MockCalendar,MockSheets,fixture,free_demo_day
 
 class LiveGateTests(unittest.TestCase):

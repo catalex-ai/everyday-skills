@@ -4,8 +4,10 @@ description: Guide authorized clinic schedule management and reporting.
 ---
 Follow AGENTS.md; it is the full rulebook. Checklist for every turn:
 
-1. Read fresh: doctor_get_schedule / doctor_get_appointment /
-   doctor_get_clinic_settings in this turn; never answer from memory.
+1. Read fresh: doctor_get_schedule / doctor_list_bookings (date ranges, with
+   patient name, phone, email) / doctor_get_appointment / doctor_get_patient /
+   doctor_find_patients / doctor_get_clinic_settings in this turn; never answer
+   from memory.
 2. If any result has tell_doctor_first, lead with it and ask whether to accept more
    that day or keep it closed. If it has ask_doctor_about_attendance, end by asking
    who didn't come that day.

@@ -6,6 +6,7 @@ from datetime import date,timedelta,datetime
 from zoneinfo import ZoneInfo
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from core import *
+from named_service import Service
 from mock import MockCalendar,MockSheets,fixture,free_demo_day
 
 class CountModeTests(unittest.TestCase):
@@ -325,7 +326,7 @@ class AbuseGuardTests(unittest.TestCase):
         args={'patient_reference':'patient-a','start':f'{self.days[0].isoformat()}T14:00:00+05:30','request_id':'guard-doc-2'}
         self.assertTrue(self.confirm(self.doc,'doctor_book_appointment',args)['calendar_confirmed'])
         self.confirm(self.doc,'doctor_mark_no_show',{'appointment_id':'missed-1','no_show':False})
-        self.assertTrue(self.book(self.days[1])['calendar_confirmed'])
+        self.assertTrue(self.book(self.days[-1])['calendar_confirmed'])  # last day: clear of the weekly limit's 7-day windows
     def test_only_past_appointments_can_be_marked(self):
         future=self.book(self.days[0])['appointment']['id']
         self.assertTrue(self.doc.call('doctor_mark_no_show',{'appointment_id':future})['conflict'])
@@ -399,6 +400,7 @@ class CountRuntimeTests(unittest.TestCase):
         day=state['events']['b-demo']['start'][:10];free_demo_day(state['events'])
         atomic(path,state)
         patient=PracticeRuntime('patient','patient-b',path);doctor=PracticeRuntime('doctor',state_path=path)
+        patient.service.patients.set_name('patient-b','Patient B')
         args={'start':day,'request_id':'runtime-b-01'}
         first=patient.call('book_my_appointment',args)
         patient.call('book_my_appointment',args|{'confirmation_token':first['confirmation_token']})

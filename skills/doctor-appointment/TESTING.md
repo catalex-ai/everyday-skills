@@ -20,6 +20,10 @@ One patient per session: the launcher picks it with `--patient ID` (in
 record is created on first use. Patient A and B are the demo defaults used by the
 shortcuts, demos, evals and smoke checks. `tests/test_patients.py` covers patient
 IDs, isolation, names and doctor bookings for any known patient.
+`tests/test_identity_details.py` covers `--patient-details` parsing, storing
+details on the session's own record, patient isolation whatever the arguments,
+name gating (`NAME_REQUIRED`), the doctor's booking list with phone and email,
+and that the patient role cannot call doctor tools.
 
 `references/validation.json` contains publisher results and file hashes.
 `scripts/verify_package.py` checks consistency with that release, not authenticity

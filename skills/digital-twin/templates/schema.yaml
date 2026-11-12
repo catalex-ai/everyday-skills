@@ -10,6 +10,16 @@ facets:
     applies_to: me
     keywords: [currently, now, works at, working at, works as, role, job, position, title, employed, founder, lead, manager, engineer, consultant]
     question: "What do you do now? Role, organisation, and what a typical week looks like."
+  - name: plans_now
+    weight: 0.9
+    applies_to: me
+    keywords: [plan, planning, next month, next year, this year, this quarter, upcoming, goal, aiming, working towards, raising, hiring, launching, moving to, will start, starting in, not raising, not hiring]
+    question: "What's happening for you right now and next? What you're working towards, and anything coming up (a move, a launch, hiring, raising money, a big decision), roughly when, and what you'd say if someone asked."
+  - name: routine
+    weight: 0.7
+    applies_to: me
+    keywords: [weekend, weekday, every morning, every evening, usually, routine, sunday, saturday, typical day, most days]
+    question: "What does a normal weekday and weekend look like for you? Who do you see regularly, and what's fixed in your week?"
   - name: past_roles
     weight: 0.8
     applies_to: me
@@ -62,3 +72,110 @@ facets:
     applies_to: unlinked_person
     keywords: []
     question: "How do you know {about}?"
+  # Persona building: what the twin needs to sound like the owner, not just
+  # know about them. kind = the item kind to count (example, opinion, story);
+  # min = how many make the facet covered; keywords match text or context.
+  # Interrogation: "someone sends you this, how would you reply?" Each answer is
+  # filed as a real message paired with the incoming one (a conversation pair).
+  # One question per situation; asked until the audience has `min` real messages
+  # (from documents, chat imports or these answers). audience: the words stored
+  # in the pair's context; category: preferred categories to file it under.
+  - name: reply_family
+    kind: example
+    mode: reply
+    audience: family
+    min: 10
+    weight: 0.95
+    category: [family, personal, small-talk]
+    keywords: [family, mother, mum, mom, father, dad, sister, brother, parent, wife, husband, partner, son, daughter, cousin, aai, baba, ammi, papa, mama]
+    messages:
+      - "did you eat? call me when you're free"
+      - "we're worried you're working too much. are you sleeping properly?"
+      - "guess what, I got the promotion!!"
+      - "what do you think, should we sell the old house?"
+      - "your cousin's wedding is in March, you're coming right?"
+      - "can you lend your brother some money this month? he's asking me"
+  - name: reply_friends
+    kind: example
+    mode: reply
+    audience: close friend
+    min: 10
+    weight: 0.95
+    category: [friends, personal, small-talk]
+    keywords: [friend, buddy, mate, school, college, roommate]
+    messages:
+      - "heyyy long time! what's going on with you?"
+      - "ugh worst week ever. my manager is impossible"
+      - "drinks friday?"
+      - "I'm thinking of quitting my job to do my own thing. thoughts?"
+      - "remember that trip we always said we'd do? this year??"
+      - "can you help me move this weekend? need muscle and a car"
+  - name: reply_peers
+    kind: example
+    mode: reply
+    audience: colleague
+    min: 8
+    weight: 0.9
+    category: [work, professional]
+    keywords: [colleague, teammate, team, co-founder, cofounder, peer, coworker, engineer, staff]
+    messages:
+      - "got a minute to look at something? not sure about my approach"
+      - "honestly I disagree with the plan we picked yesterday"
+      - "great job today, that went really well"
+      - "the deadline slipped again. what do we tell people?"
+      - "can you cover for me tomorrow? something came up"
+      - "what's your take on the new tool everyone keeps talking about?"
+  - name: reply_seniors
+    kind: example
+    mode: reply
+    audience: investor or client
+    min: 8
+    weight: 0.85
+    category: [work, professional]
+    keywords: [investor, boss, client, customer, board, funder, partner firm, sponsor]
+    messages:
+      - "Hi, quick check-in: how are things going on your side?"
+      - "Can we move our call to Thursday?"
+      - "We're not sure we'll continue next year. Convince me."
+      - "Would you be open to an intro to someone I know?"
+      - "What's the plan for the next few months?"
+      - "Could you share some numbers before our next meeting?"
+  - name: reply_public
+    kind: example
+    mode: reply
+    audience: stranger or fan
+    min: 8
+    weight: 0.85
+    category: [public, professional, work]
+    keywords: [fan, follower, stranger, public, journalist, reporter, audience, reader, viewer, podcast, interview, student]
+    messages:
+      - "Huge fan of your work! Any advice for someone just starting out?"
+      - "Honestly I think you got it wrong on that last thing you said."
+      - "Would you come speak at our event next month?"
+      - "Can I interview you for a piece I'm writing?"
+      - "What do you think about the news everyone's talking about this week?"
+      - "is this really you or someone from your team?"
+  - name: opinions
+    kind: opinion
+    min: 6
+    weight: 0.9
+    keywords: []
+    question: "What are two or three views about your work or your field that you'd argue for? Say them the way you would."
+  - name: opinion_changed
+    kind: opinion
+    min: 1
+    weight: 0.5
+    keywords: [used to, changed my mind, now i think, earlier i, no longer, anymore, i was wrong]
+    question: "Is there something you changed your mind about in the last few years? What did you think before, and now?"
+  - name: values
+    kind: opinion
+    min: 2
+    weight: 0.8
+    keywords: [care, value, never, always, principle, matter, important, believe, rule]
+    question: "What do you care about most in how you work and treat people? Anything you would never do?"
+  - name: stories
+    kind: story
+    min: 3
+    weight: 0.85
+    keywords: []
+    question: "Tell me a story you often tell about yourself: a win, a failure, or a turning point. Tell it the way you would."

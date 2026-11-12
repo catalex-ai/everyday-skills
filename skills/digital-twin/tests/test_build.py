@@ -33,7 +33,7 @@ def test_rebuild_writes_only_allowed():
     d = store.persona_dir("pro")
     facts = store.read_jsonl(d / "facts.jsonl")
     assert [f["category"] for f in facts] == ["work"]
-    assert set(facts[0]) == {"id", "about", "category", "text", "since", "by"}
+    assert set(facts[0]) == {"id", "about", "category", "text", "kind", "since", "by"}
     page = (d / "pages" / "northwind-ltd.md").read_text()
     assert page.startswith("# Northwind Ltd") and "Now: Asha works at Northwind Ltd" in page
     assert f"^{facts[0]['id']}" in page

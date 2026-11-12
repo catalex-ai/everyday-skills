@@ -3,7 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from . import gate, graph, ids, policy, raw, search, store
+from . import gate, graph, ids, policy, raw, search, store, style
 
 
 def _write(path: Path, text: str) -> None:
@@ -81,15 +81,31 @@ def _newest(items: list[dict]) -> dict:
 def rebuild(persona: str) -> dict:
     d = store.persona_dir(persona)
     d.mkdir(parents=True, exist_ok=True)
-    items = _clean(allowed_items(persona))
+    every = _clean(allowed_items(persona))
     dic = policy.dictionary()
+    examples = [i for i in every if i.get("kind") == "example"]
+    items = [i for i in every if i.get("kind") != "example"]
     g = graph.build_graph(items, dic)
     by_id = {i["id"]: i for i in items}
     produced = set()
+    stale = stale_ids(items, dic)
 
     facts = [{"id": i["id"], "about": i["about"], "category": i["category"], "text": i["text"],
-              "since": i.get("since"), "by": i["by"]} for i in items]
+              "kind": i.get("kind") or "fact", "since": i.get("since"), "by": i["by"],
+              **({"stale": True} if i["id"] in stale else {})} for i in items]
     _write(d / "facts.jsonl", "".join(json.dumps(f, ensure_ascii=False) + "\n" for f in facts))
+    from . import foils as _foils
+    fo = _foils.load()
+    # by: "you" = written by the owner on request (a reply question); else from real material.
+    ex = [{"id": i["id"], "about": i["about"], "text": i["text"], "context": i.get("context") or "",
+           **({"elicited": True} if i.get("by") == "you" else {}),
+           **({"foil": fo[i["id"]]} if i["id"] in fo else {})} for i in examples]
+    _write(d / "examples.jsonl", "".join(json.dumps(e, ensure_ascii=False) + "\n" for e in ex))
+    _write(d / "style.json", _json({**style.fingerprint(ex), "anchors": [
+        {"context": a["context"], "text": a["text"]} for a in style.anchors(ex)]}))
+    search.build_index(d / "examples", [{"id": e["id"], "about": e["about"],
+                                         "text": (e["context"] + " :: " + e["text"]).strip(" :")}
+                                        for e in ex])
     _write(d / "graph.json", _json(g))
 
     used = set()
@@ -139,6 +155,7 @@ def rebuild(persona: str) -> dict:
     _write(d / "index.md", "\n".join(idx) + "\n")
 
     cats = policy.categories()
+    _write(d / "card.md", life_card(items, g, dic, cats, stale))
     mine = [i for i in items if ids_about_me(i, dic)]
     prof = ["# Profile", ""]
     for c in sorted({i["category"] for i in mine}):
@@ -166,6 +183,94 @@ def rebuild(persona: str) -> dict:
     store.log("rebuild", persona=persona, facts=len(facts))
     return {"persona": persona, "facts": len(facts), "pages": len(pages),
             "edges": len(g["edges"]), "removed": removed}
+
+
+CARD_LINES = 45
+CARD_PEOPLE = 12
+CARD_ABOUT = 40
+CARD_ABOUT_EACH = 3
+
+
+def life_card(items: list[dict], g: dict, dic: dict, cats: dict, stale: set[str]) -> str:
+    """The things a person always knows about their own life, for this persona.
+
+    Facts about the owner (newest first, spread across categories so no single
+    topic crowds out the rest), then one line per person or organisation linked
+    to the owner. Opinions, stories and stale facts are left out: they come from
+    search when a conversation needs them."""
+    live = [i for i in items if i["id"] not in stale and (i.get("kind") or "fact") == "fact"]
+    mine = [i for i in live if ids_about_me(i, dic)]
+    by_cat: dict[str, list[dict]] = {}
+    for i in sorted(mine, key=lambda i: (str(i.get("since") or ""), i.get("created") or ""), reverse=True):
+        by_cat.setdefault(i["category"], []).append(i)
+    picked, seen = [], set()
+    while len(picked) < CARD_LINES and any(by_cat.values()):
+        for c in sorted(by_cat):
+            if by_cat[c] and len(picked) < CARD_LINES:
+                i = by_cat[c].pop(0)
+                if i["text"] not in seen:
+                    seen.add(i["text"])
+                    picked.append(i)
+    lines = [f"- {i['text']}" for i in picked]
+    # Everyone and everything linked to me, grouped by how: "child: A, B, C".
+    # Small groups first: close people are few, films and awards are many.
+    groups: dict[str, list[str]] = {}
+    rels = dic.get("relations", {})
+    for e in g.get("edges", []):
+        if "me" not in (e["s"], e["o"]) or e["s"] == e["o"] or e.get("fact") in stale:
+            continue
+        rel = str(e["rel"])
+        r = rels.get(rel) or {}
+        if e["s"] == "me":
+            other, words = e["o"], r.get("words") or []
+        else:
+            other, words = e["s"], r.get("inverse_words") or []
+        label = (words[0] if words else rel.replace("_", " "))
+        if other not in groups.setdefault(label, []):
+            groups[label].append(other)
+    people = [f"- {label}: " + ", ".join(names[:CARD_PEOPLE])
+              for label, names in sorted(groups.items(), key=lambda kv: (len(kv[1]), kv[0]))]
+    # The newest facts about the people and organisations linked to me (my
+    # company's numbers, what my partner does now), close links first.
+    linked = [n for _, names in sorted(groups.items(), key=lambda kv: (len(kv[1]), kv[0])) for n in names]
+    about_lines, seen_n = [], set()
+    for name in linked:
+        if name in seen_n:
+            continue
+        seen_n.add(name)
+        its = [i for i in live if graph.canonical(i.get("about") or "", dic) == name and i["text"] not in seen]
+        its.sort(key=lambda i: (str(i.get("since") or ""), i.get("created") or ""), reverse=True)
+        for i in its[:max(CARD_ABOUT_EACH, min(10, len(its) // 4))]:
+            seen.add(i["text"])
+            about_lines.append(f"- {i['text']}")
+        if len(about_lines) >= CARD_ABOUT:
+            break
+    out = ["# My life (things I always know)"] + (lines or ["- (nothing yet)"])
+    if about_lines:
+        out += ["", "# My people and my work, now"] + about_lines[:CARD_ABOUT]
+    if people:
+        out += ["", "# My people, places and things, by how they link to me"] + people[:30]
+    return "\n".join(out) + "\n"
+
+
+def stale_ids(items: list[dict], dic: dict) -> set[str]:
+    """Facts overtaken by a newer one: same subject and a single-valued relation
+    (lives_in, works_at as current, spouse_of...), older `since`. Kept, flagged."""
+    groups: dict[tuple, list[dict]] = {}
+    for i in items:
+        e = i.get("edge") or {}
+        rel = e.get("rel")
+        if not rel or not (dic.get("relations", {}).get(rel) or {}).get("single"):
+            continue
+        s = graph.canonical(e.get("s") or i.get("about") or "me", dic)
+        groups.setdefault((s, rel), []).append(i)
+    out = set()
+    for its in groups.values():
+        if len({graph.canonical(x["edge"]["o"], dic) for x in its}) < 2:
+            continue
+        top = _newest(its)
+        out |= {x["id"] for x in its if x["id"] != top["id"]}
+    return out
 
 
 def ids_about_me(item: dict, dic: dict) -> bool:

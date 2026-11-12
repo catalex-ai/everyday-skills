@@ -63,7 +63,7 @@ def test_no_active():
 def test_search_finds_fact_and_brief_and_profile():
     make_persona("friends", FACTS)
     policy.set_active("friends")
-    assert "- I live in Springfield and enjoy cycling [f-1]" in mcp_read.search("where does cycling happen")
+    assert "- I live in Springfield and enjoy cycling" in mcp_read.search("where does cycling happen")
     b = mcp_read.brief()
     assert all(m in b for m in ("SOUL-MARK", "VOICE-MARK", "RULES-MARK"))
     assert mcp_read.profile() == "Profile text"
@@ -144,4 +144,12 @@ def _tools(module, tmp_path):
 
 
 def test_stdio_smoke(tmp_path):
-    assert _tools("brainkit.mcp_read", tmp_path) == ["brief", "page", "profile", "search", "walk"]
+    assert _tools("brainkit.mcp_read", tmp_path) == ["ask_owner", "brief", "check_reply", "examples", "search"]
+
+
+def test_search_includes_page_of_named_entity():
+    make_persona("friends", FACTS)
+    policy.set_active("friends")
+    out = mcp_read.search("how is Asha doing these days")
+    assert "About Asha:" in out and "# Asha" in out
+    assert "About Asha:" not in mcp_read.search("cycling")

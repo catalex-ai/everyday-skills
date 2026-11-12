@@ -78,12 +78,21 @@ the same value when you start Claude.
 ## Things to say to the manager
 
 - "Create a persona called Professional for people I work with."
+- "Here's a chat with my sister." (paste or attach a WhatsApp export: one chat
+  per kind of person, a normal recent one is best; this is what makes the twin
+  sound like you)
+- "Ask me how I'd reply to a few messages."
 - "Add my CV." (attach a file or paste a link)
 - "The twin should use Professional."
 - "You said I live in Pune. It should be Leeds."
 - "Make the twin sound more casual."
 - "Never keep my phone number." / "Allow my email in Personal."
 - "Tidy up." / "Show me what the twin knows."
+
+After new chats or replies, the manager runs `make_foils`: for each real
+message it writes the polished version a bot would have sent, and the twin is
+shown both, so it learns what not to sound like. It needs the `claude` command
+line.
 
 "Show me what the twin knows" writes `audit.html` in the brain folder. Open it in
 a browser. It lists each persona, its facts by topic, open questions and

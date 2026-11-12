@@ -3,7 +3,7 @@ from . import gate, store
 from .ids import fact_id, source_id
 
 _COLS = ("id", "text", "about", "category", "edge_s", "edge_rel", "edge_o", "src", "since",
-         "conf", "by", "status", "created", "updated")
+         "conf", "by", "status", "created", "updated", "kind", "context")
 
 
 def _save_held(con, rows, src=None):
@@ -34,6 +34,8 @@ def add_items(items: list[dict]) -> list[str]:
         for it in items:
             if it["category"] not in known:
                 raise ValueError(f"unknown category: {it['category']}; known: {known}")
+            if (it.get("kind") or "fact") not in store.KINDS:
+                raise ValueError(f"unknown kind: {it.get('kind')}; known: {list(store.KINDS)}")
         out = []
         with con:
             for it in items:
@@ -53,16 +55,21 @@ def add_items(items: list[dict]) -> list[str]:
                 old = con.execute("SELECT by FROM items WHERE id=?", (iid,)).fetchone()
                 if old and old["by"] == "you" and by != "you":
                     continue
+                ctx = it.get("context")
+                if ctx:
+                    ctx, h3 = gate.redact(str(ctx), src)
+                    _save_held(con, h3, src)
                 vals = (text, it.get("about", "me"), it["category"], es, erel, eo, src,
-                        it.get("since"), it.get("conf", "medium"), by)
+                        it.get("since"), it.get("conf", "medium"), by, it.get("kind") or "fact", ctx)
                 if old:
                     con.execute(
                         "UPDATE items SET text=?,about=?,category=?,edge_s=?,edge_rel=?,edge_o=?,src=?,"
-                        "since=?,conf=?,by=?,updated=? WHERE id=?", vals + (now, iid))
+                        "since=?,conf=?,by=?,kind=?,context=?,updated=? WHERE id=?", vals + (now, iid))
                 else:
                     con.execute(
                         "INSERT INTO items(text,about,category,edge_s,edge_rel,edge_o,src,since,conf,by,"
-                        "id,status,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?,?,'active',?,?)",
+                        "kind,context,id,status,created,updated) "
+                        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'active',?,?)",
                         vals + (iid, now, now))
     finally:
         con.close()
@@ -72,6 +79,7 @@ def add_items(items: list[dict]) -> list[str]:
 
 def _row(r) -> dict:
     d = {k: r[k] for k in _COLS if not k.startswith("edge_")}
+    d["kind"] = d.get("kind") or "fact"
     d["edge"] = ({"s": r["edge_s"], "rel": r["edge_rel"], "o": r["edge_o"]}
                  if any(r[k] is not None for k in ("edge_s", "edge_rel", "edge_o")) else None)
     return d
@@ -138,6 +146,12 @@ def apply_privacy() -> dict:
                 if new != r["text"]:
                     con.execute("UPDATE sources SET text=? WHERE id=?", (new, r["id"]))
                     ns += 1
+            for r in con.execute("SELECT id,context,src FROM items WHERE context IS NOT NULL").fetchall():
+                c, h4 = gate.redact(r["context"], r["src"])
+                c = _demote(c, dropped)
+                _save_held(con, h4)
+                if c != r["context"]:
+                    con.execute("UPDATE items SET context=? WHERE id=?", (c, r["id"]))
             for r in con.execute("SELECT id,text,edge_o,src FROM items").fetchall():
                 new, held = gate.redact(r["text"], r["src"])
                 eo, h2 = (gate.redact(r["edge_o"], r["src"]) if r["edge_o"] is not None

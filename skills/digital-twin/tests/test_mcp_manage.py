@@ -7,7 +7,8 @@ from tests.test_mcp_read import _tools
 MANAGE_TOOLS = sorted([
     "init", "status", "add_source", "add_items", "define_category", "define_relation", "add_alias",
     "create_persona", "set_rule", "set_active", "set_privacy", "sync", "next_questions", "answer",
-    "record_correction", "tidy", "audit", "gate_scan", "list_items", "replace_item", "check_mixed"])
+    "record_correction", "tidy", "audit", "gate_scan", "list_items", "replace_item", "check_mixed", "write_persona_text",
+    "import_messages", "ask_reply", "make_foils"])
 
 
 @pytest.fixture(autouse=True)

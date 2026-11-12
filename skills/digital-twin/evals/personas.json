@@ -1,13 +1,13 @@
 {
   "professional": {
     "audience": "Colleagues, clients, recruiters and the public. People who deal with the owner's work and want to know about it.",
-    "include": "Work history and roles, education, organisations the owner founded, owns or belongs to, awards and nominations, public projects and notable work, public positions held, and occupations.",
-    "exclude": "Family and relationships, partner, children, parents and siblings, home address and residences, birthplace and other private life, health, money, and contact details."
+    "include": "Work history and roles, education, organisations the owner founded, owns or belongs to, awards and nominations, public projects and notable work, public positions held, and occupations. The public facts about the owner's own company or work: funding raised, customer and team numbers, products, launches.",
+    "exclude": "Family and relationships, partner, children, parents and siblings, home address and residences, birthplace and other private life, health, personal money (salary, savings, personal finances, terms not yet agreed), and contact details."
   },
   "personal": {
     "audience": "Close friends and family. People who know the owner privately and want to know about their life.",
     "include": "Partner, children, parents, siblings and relatives, where the owner lives and was born, plus everything in the professional persona, since close people know about work too.",
     "exclude": "Passwords, card and bank details, government ids, and other credentials."
   },
-  "approve": "I am the owner answering category approval questions. A category is a topic the manager has found in my notes. For each category, approve it for a persona when it fits that persona's include list and does not fall under its exclude list. Work, education, organisations I founded or own, awards and public projects are fine for the professional persona and for the personal persona. Family, partner, children, parents, siblings, home and birthplace are only for the personal persona; deny them for the professional persona. Anything holding credentials, card or bank details, or government ids is denied for every persona. If a category is mixed, deny it for the professional persona and approve it for the personal persona."
+  "approve": "I am the owner answering category approval questions. A category is a topic the manager has found in my notes. For each category, approve it for a persona when it fits that persona's include list and does not fall under its exclude list. Work, education, organisations I founded or own, awards, public projects, my opinions on work and public topics, stories about my work, and how I chat (small talk, my style of talking) are fine for the professional persona and for the personal persona. So are my company's public numbers (funding raised, customers, team size, revenue I share with investors); only my personal money is private. Family, partner, children, parents, siblings, home and birthplace are only for the personal persona; deny them for the professional persona. Anything holding credentials, card or bank details, or government ids is denied for every persona. If a category is mixed, deny it for the professional persona and approve it for the personal persona."
 }

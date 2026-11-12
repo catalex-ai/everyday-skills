@@ -102,6 +102,71 @@ def twin(env, q: str, model: str) -> tuple[str, str]:
     return reply, "\n".join(tools)
 
 
+def owner_round(corpus: Path, run: Path, env: dict, a, log: Path, n: int,
+                interview: bool = False) -> int:
+    """The manager's next n questions go to the simulated owner; answers go back. Returns count."""
+    qs = cli(env, "next", str(n))
+    qs = qs if isinstance(qs, list) else qs.get("questions", [])
+    if not qs:
+        if interview:
+            manager(env, "I have a few minutes. Ask me more 'how would you reply?' questions: queue "
+                         "some with ask_reply for the people in my life you have the fewest real "
+                         "messages for.", a.manager_model, log)
+        return 0
+    answers = []
+    for q in qs:
+        ans = simulate_owner.answer(q, corpus, a.owner_model, cwd=run,
+                                    noise_rate=getattr(a, "owner_noise", 0.0))
+        answers.append(f"[{q.get('id')}] {q.get('text')}\nMy answer: {ans}")
+    tail = ("\n\nFile each, then queue a follow-up 'how would you reply?' for each reply "
+            "question I answered." if interview else "")
+    manager(env, "Here are my answers to your questions:\n\n" + "\n\n".join(answers) + tail,
+            a.manager_model, log)
+    return len(qs)
+
+
+def ingest(corpus: Path, run: Path, env: dict, a, personas: dict, meta: dict, log: Path) -> None:
+    """Fresh brain, personas, sources in batches with PII notes, owner Q&A, tidy."""
+    if run.exists():
+        shutil.rmtree(run)
+    (run / "notes").mkdir(parents=True)
+    cli(env, "init")
+    pdesc = "\n".join(f"- slug '{k}': audience: {v['audience']} include: {v['include']} "
+                      f"exclude: {v['exclude']}" for k, v in personas.items() if k != "approve")
+    manager(env, "Set up my twin. Create these two personas exactly with these slugs, "
+                 f"and make 'professional' the active one:\n{pdesc}", a.manager_model, log)
+
+    pii = [json.loads(l) for l in Path(a.pii).expanduser().read_text().splitlines() if l.strip()]
+    sources = sorted((corpus / "sources").glob("*.txt"))
+    asked = 0
+    for bi in range(0, len(sources), a.batch):
+        files = [str(p) for p in sources[bi:bi + a.batch]]
+        for k in range(a.pii_per_batch):
+            if pii:
+                row = pii.pop(0)
+                note = run / "notes" / f"note-{bi:02d}-{k}.txt"
+                note.write_text("A note I saved:\n" + row["text"], encoding="utf-8")
+                files.append(str(note))
+        manager(env,
+                f"Add these files to my brain. The documents that describe me call me "
+                f"'{meta['label']}'; I am the owner, so file facts about that person as facts "
+                f"about me (about='me', first person). Other documents are background on people, "
+                f"places and organisations in my life: keep only what relates to me or to people "
+                f"and organisations connected to me.\nFiles:\n" + "\n".join(files),
+                a.manager_model, log)
+        if asked < a.questions:
+            asked += owner_round(corpus, run, env, a, log, 3)
+    # Interrogation: the owner sits with the manager and answers until done.
+    idle = 0
+    while asked < getattr(a, "interrogate", 0) and idle < 2:
+        n = owner_round(corpus, run, env, a, log, 4, interview=True)
+        asked += n
+        idle = idle + 1 if n == 0 else 0
+    manager(env, "Tidy up and sync everything, then tell me the status in two lines.",
+            a.manager_model, log)
+
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--corpus", required=True)
@@ -113,6 +178,10 @@ def main() -> int:
     ap.add_argument("--batch", type=int, default=6)
     ap.add_argument("--pii-per-batch", type=int, default=2)
     ap.add_argument("--questions", type=int, default=20, help="max owner questions answered")
+    ap.add_argument("--interrogate", type=int, default=0,
+                    help="after the sources, keep asking the owner until this many answers in all")
+    ap.add_argument("--owner-noise", type=float, default=0.0,
+                    help="share of owner answers that are lazy, garbage, skipped, rambling or typos")
     ap.add_argument("--jobs", type=int, default=4)
     ap.add_argument("--qa-only", action="store_true", help="reuse the brain, re-run QA only")
     a = ap.parse_args()
@@ -126,46 +195,7 @@ def main() -> int:
     personas = json.loads((HERE / "personas.json").read_text(encoding="utf-8"))
 
     if not a.qa_only:
-        if run.exists():
-            shutil.rmtree(run)
-        (run / "notes").mkdir(parents=True)
-        cli(env, "init")
-        pdesc = "\n".join(f"- slug '{k}': audience: {v['audience']} include: {v['include']} "
-                          f"exclude: {v['exclude']}" for k, v in personas.items() if k != "approve")
-        manager(env, "Set up my twin. Create these two personas exactly with these slugs, "
-                     f"and make 'professional' the active one:\n{pdesc}", a.manager_model, log)
-
-        pii = [json.loads(l) for l in Path(a.pii).expanduser().read_text().splitlines() if l.strip()]
-        sources = sorted((corpus / "sources").glob("*.txt"))
-        asked = 0
-        for bi in range(0, len(sources), a.batch):
-            files = [str(p) for p in sources[bi:bi + a.batch]]
-            for k in range(a.pii_per_batch):
-                if pii:
-                    row = pii.pop(0)
-                    note = run / "notes" / f"note-{bi:02d}-{k}.txt"
-                    note.write_text("A note I saved:\n" + row["text"], encoding="utf-8")
-                    files.append(str(note))
-            manager(env,
-                    f"Add these files to my brain. The documents that describe me call me "
-                    f"'{meta['label']}'; I am the owner, so file facts about that person as facts "
-                    f"about me (about='me', first person). Other documents are background on people, "
-                    f"places and organisations in my life: keep only what relates to me or to people "
-                    f"and organisations connected to me.\nFiles:\n" + "\n".join(files),
-                    a.manager_model, log)
-            if asked < a.questions:
-                qs = cli(env, "next", "3")
-                qs = qs if isinstance(qs, list) else qs.get("questions", [])
-                if qs:
-                    answers = []
-                    for q in qs:
-                        ans = simulate_owner.answer(q, corpus, a.owner_model, cwd=run)
-                        answers.append(f"[{q.get('id')}] {q.get('text')}\nMy answer: {ans}")
-                        asked += 1
-                    manager(env, "Here are my answers to your questions:\n\n" + "\n\n".join(answers),
-                            a.manager_model, log)
-        manager(env, "Tidy up and sync everything, then tell me the status in two lines.",
-                a.manager_model, log)
+        ingest(corpus, run, env, a, personas, meta, log)
 
     qa = json.loads((corpus / "qa.json").read_text(encoding="utf-8"))
     results = []

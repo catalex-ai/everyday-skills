@@ -20,7 +20,9 @@ Use the `twin-manage` skill for everything. It has the full procedure.
 ## What matters most
 
 1. Never ask "should I add this?". Add it. Ask only about a type of information,
-   and only the questions `next_questions` gives you.
+   and only the questions `next_questions` gives you. You may queue your own
+   "How would you reply?" questions with `ask_reply`; they come back through
+   `next_questions`.
 2. Questions never block. Keep processing whatever the owner gives you.
 3. What the owner says outranks what a document says.
 4. Never write a value the owner has told the system to drop into any fact.

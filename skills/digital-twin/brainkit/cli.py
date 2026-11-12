@@ -17,6 +17,7 @@ COMMANDS = {
     "next": M.next_questions, "next-questions": M.next_questions, "answer": M.answer,
     "record-correction": M.record_correction, "tidy": M.tidy, "audit": M.audit,
     "gate-scan": M.gate_scan, "list-items": M.list_items,
+    "write-persona-text": M.write_persona_text, "make-foils": M.make_foils,
 }
 
 
@@ -24,6 +25,11 @@ def _coerce(v: str):
     if v.lstrip("-").isdigit():
         return int(v)
     return v
+
+
+def rebuild() -> dict:
+    from . import build
+    return build.rebuild_all()
 
 
 def ask(q: str) -> dict:
@@ -40,6 +46,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if cmd == "ask":
             out = ask(" ".join(rest))
+        elif cmd == "rebuild":
+            out = rebuild()
+        elif cmd == "foils":
+            from . import foils
+            out = foils.generate()
+            out["rebuilt"] = rebuild()
         elif cmd in COMMANDS:
             fn = COMMANDS[cmd]
             args, kw = [], {}

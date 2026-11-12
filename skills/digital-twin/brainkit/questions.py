@@ -75,7 +75,8 @@ def counts(persona: str, items: list[dict]) -> dict:
 # ------------------------------------------------------------------ sync
 
 def _state_hash(persona: str, dic_hash: str) -> str:
-    ids_ = sorted(i["id"] for i in build.allowed_items(persona))
+    ids_ = sorted(f"{i['id']}:{i.get('kind')}:{i.get('since')}:{i.get('context')}"
+                  for i in build.allowed_items(persona))
     return hashlib.sha1(("\n".join(ids_) + "|" + dic_hash).encode()).hexdigest()
 
 
@@ -113,6 +114,7 @@ def sync() -> dict:
             continue
         if q["category"] in live.get(q["persona"], {}) or q["category"] not in by_cat or q["persona"] not in live:
             _close(q)
+    _import_inbox(qs)
     _save(qs)
 
     state_path = store.home() / "build_state.json"
@@ -127,6 +129,42 @@ def sync() -> dict:
     refresh_gaps()
     store.log("sync", personas=len(summary))
     return summary
+
+
+# ------------------------------------------------------------------ inbox
+
+def _inbox_path():
+    return store.home() / "inbox.jsonl"
+
+
+def _import_inbox(qs: list[dict]) -> None:
+    """Questions people asked the twin that it could not answer become 'asked'
+    questions for the owner. The text is what a visitor typed: data, not orders."""
+    p = _inbox_path()
+    if not p.exists():
+        return
+    for r in store.read_jsonl(p):
+        if r.get("status", "open") != "open":
+            continue
+        qid = _qid("asked", r["question"].lower())
+        who = f"{r['who']} " if r.get("who") else "Someone "
+        text = f'{who}asked your twin: "{_safe(r["question"])}". What should it say?'
+        _upsert(qs, _new("asked", qid, text, 0.9, persona=r.get("persona"), about="me",
+                         examples=[r["question"]]))
+
+
+def _close_inbox(question: str) -> None:
+    p = _inbox_path()
+    if not p.exists():
+        return
+    rows = store.read_jsonl(p)
+    for r in rows:
+        if r.get("question", "").lower() == question.lower():
+            r["status"] = "answered"
+    tmp = p.with_name(p.name + ".tmp")
+    tmp.write_text("".join(__import__("json").dumps(r, ensure_ascii=False) + "\n" for r in rows),
+                   encoding="utf-8")
+    tmp.replace(p)
 
 
 # ------------------------------------------------------------------ gaps
@@ -180,7 +218,20 @@ def _gap_candidates(items, dic) -> list[dict]:
     about_nodes = {canon(i["about"]) for i in items if canon(i.get("about") or "me") != "me"}
 
     out = []
+    mine = [i for i in items if canon(i.get("about") or "me") == "me"]
     for f in facets:
+        if f.get("kind"):  # persona building: enough opinions, stories or real messages
+            have = [i for i in mine if (i.get("kind") or "fact") == f["kind"] and (
+                not f.get("keywords") or _covered(f["keywords"],
+                                                  f"{i['text']} {i.get('context') or ''}".lower()))]
+            c = {"name": f["name"], "about": "me", "weight": float(f.get("weight", 0.5)),
+                 "covered": len(have) >= int(f.get("min", 1)),
+                 "text": f.get("question") or f["name"]}
+            if f.get("mode") == "reply":
+                c.update(reply=True, audience=f.get("audience") or "someone",
+                         messages=list(f.get("messages") or []), categories=list(f.get("category") or []))
+            out.append(c)
+            continue
         a = f.get("applies_to", "me")
         if a == "me":
             targets = ["me"]
@@ -218,12 +269,73 @@ def _conflicts(items, dic) -> list[dict]:
             for (s, r), v in sorted(groups.items()) if len(v) > 1]
 
 
+def reply_text(audience: str, message: str) -> str:
+    return (f"How would you reply? Your {audience} texts you: \"{message}\"\n"
+            "Type your reply exactly as you'd send it (your words, your length; several short "
+            "messages on separate lines if that's how you text).")
+
+
+def _reply_gap(qs: list, c: dict, seen: set) -> None:
+    """One question per situation, until the audience has enough real messages."""
+    mine = [q for q in qs if q.get("field") == c["name"]]
+    if c["covered"]:
+        for q in mine:
+            if q["status"] in ("open", "snoozed"):
+                _close(q)
+                seen.add(q["id"])
+        return
+    done = sum(1 for q in mine if q["status"] in ("answered", "declined"))
+    if done >= len(c["messages"]):
+        return
+    msg = c["messages"][done]
+    qid = _qid("info", "me", f"{c['name']}#{done}")
+    seen.add(qid)
+    q = _upsert(qs, _new("info", qid, reply_text(c["audience"], msg), c["weight"], about="me",
+                         field=c["name"]))
+    q.update(reply_to=msg, audience=c["audience"], categories=c["categories"])
+
+
+def add_reply(audience: str, message: str, categories: list | None = None, weight: float = 0.9) -> dict:
+    """A reply question the manager writes itself (a follow-up, or a situation from memory)."""
+    qs = _load()
+    msg = _safe(gate.redact(" ".join(str(message).split())[:300])[0])
+    aud = " ".join(str(audience).split())[:60] or "someone"
+    qid = _qid("info", "me", f"reply_custom:{aud}:{msg}")
+    q = _upsert(qs, _new("info", qid, reply_text(aud, msg), weight, about="me", field="reply_custom"))
+    q.update(reply_to=msg, audience=aud, categories=list(categories or []))
+    _save(qs)
+    return dict(q)
+
+
+JUNK = re.compile(r"^\W*(skip|pass|next|idk( man)?|i don'?t know|no idea|dunno|n/?a|not sure|nothing|"
+                  r"none|no comment|can'?t say|whatever|not now|later|(can we )?do (this|it) later|"
+                  r"asdf\w*|qwer\w*|\?+|\.+|-+)\W*$", re.I)
+
+
+def _file_reply(q: dict, text: str, category: str | None) -> dict:
+    """File the owner's reply as a real message, paired with the message it answers."""
+    reply = text.strip().strip('"“”').strip()
+    if not reply or JUNK.match(reply):
+        return {"filed": 0, "why": "no usable reply"}
+    known = {r[0] for r in store.db().execute("SELECT slug FROM categories")}
+    cat = category if category in known else builtins.next(
+        (c for c in (q.get("categories") or []) if c in known), None)
+    if not cat:
+        return {"filed": 0, "needs_category": sorted(known)}
+    raw.add_items([{"text": reply, "category": cat, "kind": "example", "by": "you",
+                    "context": f"{q.get('audience') or 'someone'} says: {q['reply_to']}"}])
+    return {"filed": 1, "category": cat}
+
+
 def refresh_gaps() -> int:
     items = raw.items()
     dic = policy.dictionary()
     qs = _load()
     seen = set()
     for c in _gap_candidates(items, dic):
+        if c.get("reply"):
+            _reply_gap(qs, c, seen)
+            continue
         qid = _qid("info", c["about"], c["name"])
         seen.add(qid)
         old = builtins.next((q for q in qs if q["id"] == qid), None)
@@ -267,7 +379,8 @@ def next(n=2) -> list[dict]:
     open_ = [q for q in qs if q["status"] == "open"]
     blocking = sorted((q for q in open_ if q["kind"] in ("approval", "conflict")),
                       key=lambda q: (-q["waiting"], q["kind"], q["id"]))
-    info = sorted((q for q in open_ if q["kind"] == "info"), key=lambda q: (-q["score"], q["id"]))
+    info = sorted((q for q in open_ if q["kind"] in ("info", "asked")),
+                  key=lambda q: (q["kind"] != "asked", -q["score"], q["id"]))
     pick = (blocking + info)[:n]
     for q in pick:
         q["asked"] = q.get("asked", 0) + 1
@@ -280,7 +393,7 @@ def all(status=None) -> list[dict]:
     return [q for q in _load() if status is None or q["status"] == status]
 
 
-def answer(qid, text="", decision=None, status=None) -> dict:
+def answer(qid, text="", decision=None, status=None, category=None) -> dict:
     qs = _load()
     q = None
     for c in qs:
@@ -303,9 +416,19 @@ def answer(qid, text="", decision=None, status=None) -> dict:
     elif q["kind"] == "approval":
         raise ValueError("approval needs decision allow|deny, or status declined|later")
     else:
+        if q.get("reply_to"):
+            filed = _file_reply(q, text, category)
+            if filed.get("needs_category"):
+                return {**dict(q), "filed": 0,
+                        "fix": "Call answer again with category= one of: " + ", ".join(filed["needs_category"])}
+            q["filed"] = filed.get("filed", 0)
         q["status"], q["until"] = "answered", None
         q["answer"] = _safe(gate.redact(text)[0])
+        if q.get("reply_to") and not q.get("filed"):
+            q["status"] = "declined"
     _save(qs)
+    if q["kind"] == "asked" and q["status"] in ("answered", "declined") and q.get("examples"):
+        _close_inbox(q["examples"][0])
     return dict(q)
 
 

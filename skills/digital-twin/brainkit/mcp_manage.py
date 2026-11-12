@@ -81,7 +81,9 @@ def add_source(text: str, origin: str) -> dict:
 
 @tool
 def add_items(items: list[dict]) -> dict:
-    """Add facts. Each item has text and category, and optionally about, edge {s, rel, o}, src, since, conf, by."""
+    """Add items. Each has text and category, and optionally kind (fact, opinion, story, example),
+    context (for an example: what the message was replying to), about, edge {s, rel, o}, src,
+    since, conf, by."""
     ids = raw.add_items(items)
     out = {"ids": ids, "waiting": []}
     from . import lint
@@ -90,13 +92,69 @@ def add_items(items: list[dict]) -> dict:
         out["mixed"] = mixed
         out["fix"] = ("These facts name a relationship of another type. Split each with "
                       "replace_item: keep the name, drop the relationship word, and add the "
-                      "relationship as its own fact in its own category.")
+                      "relationship as its own fact in its own category. An example (a verbatim "
+                      "message) is never split: re-file it, same text, under the relationship's "
+                      "category.")
     try:
         from . import questions
         questions.sync()
         out["waiting"] = _waiting()
     except ImportError:
         pass
+    from . import corrections
+    hint = corrections.stale_hint()
+    if hint:
+        out["next"] = hint
+    return out
+
+
+@tool
+def import_messages(text: str, me: str, audience: str, category: str, src: str = "",
+                    since: str | None = None) -> dict:
+    """File the owner's real messages from a chat export or interview transcript, verbatim,
+    each paired with what the other person said just before. Use this for every chat export,
+    pasted conversation or interview, instead of add_items. me: the owner's name as it appears
+    in the text (first name is enough); audience: who the other person is to the owner, e.g.
+    "close friend", "mother", "co-founder", "investor", "journalist", "fan"; category: where the
+    messages belong (privacy follows the category); src: the source id from add_source."""
+    from . import messages
+    found = messages.pairs(text, me)
+    if not found:
+        return {"added": 0, "hint": ("No messages from the owner found. Check 'me' matches the "
+                                     "owner's name in the text exactly (e.g. 'Asha').")}
+    items = [{"text": p["text"], "category": category, "kind": "example", "src": src or None,
+              "since": since, "context": messages.context(audience, p["they_who"], p["they"])}
+             for p in found]
+    out = add_items(items)
+    out["added"] = len(found)
+    out["pairs"] = sum(1 for p in found if p["they"])
+    out.pop("ids", None)
+    return out
+
+
+@tool
+def ask_reply(audience: str, message: str, category: str | None = None) -> dict:
+    """Queue your own "How would you reply?" question: a realistic message someone in the owner's
+    life might send (a follow-up in a thread you just asked about, or a situation built from people
+    and events you know). audience: who sends it ("sister", "co-founder", "a fan"). The owner's
+    answer is filed as a real message paired with this one."""
+    from . import questions
+    q = questions.add_reply(audience, message, [category] if category else [])
+    return {"id": q["id"], "text": q["text"]}
+
+
+@tool
+def make_foils(limit: int = 300) -> dict:
+    """For each of the owner's real messages that lacks one, write the polished reply a generic AI
+    assistant would have sent instead, and rebuild the personas. The twin sees each real message next
+    to its bot version, which keeps its replies from sounding like a bot. Run it after importing chats
+    or filing reply answers. Uses a small model through the `claude` command line."""
+    import shutil
+    from . import build, foils
+    if not shutil.which("claude"):
+        return {"error": "The claude command line is not installed here, so foils cannot be made."}
+    out = foils.generate(limit=limit)
+    out["rebuilt"] = build.rebuild_all()
     return out
 
 
@@ -192,8 +250,10 @@ def set_privacy(type: str, mode: str) -> dict:
 @tool
 def sync() -> dict:
     """Update the list of open questions from the current facts and rules."""
-    from . import questions
-    return questions.sync()
+    from . import corrections, questions
+    out = questions.sync()
+    hint = corrections.stale_hint()
+    return {**out, "next": hint} if hint else out
 
 
 @tool
@@ -205,10 +265,29 @@ def next_questions(n: int = 2) -> list:
 
 @tool
 def answer(question_id: str, text: str = "", decision: str | None = None,
-           status: str | None = None) -> dict:
-    """Record the owner's answer, decision, or a decline/snooze for a question."""
-    from . import questions
-    return questions.answer(question_id, text, decision, status)
+           status: str | None = None, category: str | None = None) -> dict:
+    """Record the owner's answer, decision, or a decline/snooze for a question. For a "How would
+    you reply?" question, pass the owner's reply exactly as they typed it: it is filed as a real
+    message paired with the message it answers (category: where to file it, if you want to choose)."""
+    from . import corrections, questions
+    out = questions.answer(question_id, text, decision, status, category)
+    field = out.get("field") or ""
+    if out.get("status") == "answered" and field in BUILD_FIELDS:
+        out["next"] = BUILD_FIELDS[field]
+    elif out.get("filed"):
+        out["next"] = ("Filed as a real message. Queue one follow-up with ask_reply: what the same "
+                       "person might say next, or a similar moment with someone from the owner's life.")
+    hint = corrections.stale_hint()
+    if hint:
+        out["also"] = hint
+    return out
+
+
+BUILD_FIELDS = {
+    **{f: "Store each view with add_items: kind='opinion', in the owner's words, since=today, by='you'."
+       for f in ("opinions", "opinion_changed", "values")},
+    "stories": "Store each story with add_items: kind='story', 1 to 3 sentences, first person, by='you'.",
+}
 
 
 @tool
@@ -217,6 +296,13 @@ def record_correction(said: str, should: str, target: str, persona: str | None =
     """Record a correction. Target is one of voice, rules, item, category, schema, soul, privacy."""
     from . import corrections
     return corrections.record(said, should, target, persona, payload)
+
+
+@tool
+def write_persona_text(persona: str, part: str, text: str) -> dict:
+    """Replace a persona's soul, voice or rules text with a new draft written from evidence."""
+    from . import corrections
+    return corrections.write_text(persona, part, text)
 
 
 @tool

@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS sources(id TEXT PRIMARY KEY, origin TEXT, added TEXT,
 CREATE TABLE IF NOT EXISTS items(id TEXT PRIMARY KEY, text TEXT NOT NULL, about TEXT NOT NULL DEFAULT 'me',
   category TEXT NOT NULL, edge_s TEXT, edge_rel TEXT, edge_o TEXT, src TEXT, since TEXT,
   conf TEXT DEFAULT 'medium', by TEXT DEFAULT 'doc', status TEXT DEFAULT 'active',
-  created TEXT, updated TEXT);
+  created TEXT, updated TEXT, kind TEXT DEFAULT 'fact', context TEXT);
 CREATE INDEX IF NOT EXISTS items_cat ON items(category);
 CREATE INDEX IF NOT EXISTS items_about ON items(about);
 CREATE INDEX IF NOT EXISTS items_status ON items(status);
@@ -22,6 +22,15 @@ CREATE TABLE IF NOT EXISTS categories(slug TEXT PRIMARY KEY, description TEXT);
 CREATE TABLE IF NOT EXISTS rules(persona TEXT, category TEXT, decision TEXT, PRIMARY KEY(persona, category));
 CREATE TABLE IF NOT EXISTS personas(slug TEXT PRIMARY KEY, audience TEXT, include TEXT, exclude TEXT, created TEXT);
 """
+
+# Columns added after the first release; brains made before get them on open.
+MIGRATIONS = [("kind", "kind TEXT DEFAULT 'fact'"), ("context", "context TEXT")]
+
+# What an item is. fact: something true about the owner or their world.
+# opinion: what the owner thinks. story: something that happened, told as the
+# owner would. example: a message the owner really wrote, verbatim, used only
+# to copy how they sound (context says what it was a reply to).
+KINDS = ("fact", "opinion", "story", "example")
 
 
 def home() -> Path:
@@ -43,6 +52,10 @@ def init(home_: Path | None = None) -> Path:
     con = sqlite3.connect(h / "raw" / "brain.sqlite")
     try:
         con.executescript(SCHEMA)
+        have = {r[1] for r in con.execute("PRAGMA table_info(items)")}
+        for col, ddl in MIGRATIONS:
+            if col not in have:
+                con.execute(f"ALTER TABLE items ADD COLUMN {ddl}")
         con.commit()
     finally:
         con.close()

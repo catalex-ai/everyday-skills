@@ -123,7 +123,7 @@ def import_messages(text: str, me: str, audience: str, category: str, src: str =
         return {"added": 0, "hint": ("No messages from the owner found. Check 'me' matches the "
                                      "owner's name in the text exactly (e.g. 'Asha').")}
     items = [{"text": p["text"], "category": category, "kind": "example", "src": src or None,
-              "since": since, "context": messages.context(audience, p["they_who"], p["they"])}
+              "since": since, "context": messages.context(audience, p["they_who"], p["they"], p.get("earlier"))}
              for p in found]
     out = add_items(items)
     out["added"] = len(found)

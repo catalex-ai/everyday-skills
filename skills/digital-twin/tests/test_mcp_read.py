@@ -153,3 +153,29 @@ def test_search_includes_page_of_named_entity():
     out = mcp_read.search("how is Asha doing these days")
     assert "About Asha:" in out and "# Asha" in out
     assert "About Asha:" not in mcp_read.search("cycling")
+
+
+def test_examples_bring_relationship_memory():
+    facts = FACTS + [{"id": "f-9", "about": "Rohan Kulkarni", "text": "Rohan was offered a job in Bangalore.",
+                      "since": "2026-10", "edge": None}]
+    d = make_persona("friends", facts)
+    exs = [{"id": "e-1", "about": "me", "text": "bangalore. you've been bored in pune for 2 years",
+            "context": "close friend (Rohan) says: should i take the bangalore offer"},
+           {"id": "e-2", "about": "me", "text": "haha ok", "context": "former colleague (Karthik) says: lol"}]
+    (d / "examples.jsonl").write_text("\n".join(json.dumps(x) for x in exs) + "\n", encoding="utf-8")
+    search.build_index(d / "examples", [{"id": x["id"], "text": x["context"] + " :: " + x["text"]} for x in exs])
+    policy.set_active("friends")
+    out = mcp_read.examples("how's it going", "Rohan, close friend")
+    assert out.startswith("You and Rohan Kulkarni") and "offered a job in Bangalore" in out
+    assert "Your last messages with Rohan" in out
+    assert not mcp_read.examples("how's it going", "investor").startswith("You and")
+
+
+def test_search_says_when_nothing_is_on_topic():
+    make_persona("friends", FACTS)
+    policy.set_active("friends")
+    out = mcp_read.search("running marathon")
+    assert "your memory has nothing on that" in out
+    assert "nothing on that" not in mcp_read.search("cycling")
+    assert mcp_read._off_topic("do you still run?", "I run on Saturday mornings") == []
+    assert mcp_read._off_topic("running", "I ran my first half in 2:14, runs every week") == []

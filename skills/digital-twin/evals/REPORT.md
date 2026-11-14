@@ -122,3 +122,60 @@ plays it straight", and the twin stays straighter there (lowest tone_read,
 Known limits: the twin sometimes plays along with a sceptic's exaggeration
 instead of correcting it deadpan, and a first name that matches a relative
 ("Maya") can still be taken for that relative.
+
+# Human-conversation hill-climb: moods that move with the chat
+
+Goal: the twin should react the way a person does in each moment. It shouldn't be
+always joking, always heavy or always formal. Ideas taken from a "conversational
+intelligence" prompt: read the whole chat (callbacks, open questions, where the
+mood is now, when it is closing), name more modes (venting, excited, debating,
+closing), don't treat the capabilities as a checklist, and keep three memory
+layers (the chat, the person, the owner).
+
+Setup: a synthetic founder owner (dossier, two investor updates, a post, six
+WhatsApp chats across a close friend, mother, co-founder, investor, ex-colleague
+and a friend; kept in `~/.twin-corpora/`, never committed). Suites `human` (new,
+16 chats with a mood per turn), `tone` (14) and `founder` (26): 56 chats and 78
+replies per round. Twin, manager and simulated owner all ran on **Haiku**, with
+an Opus judge (v9, batched).
+
+| Round | Change | knowledge | persona | natural | tone | fabrications |
+|---|---|---|---|---|---|---|
+| b0 | baseline | 4.66 | 4.00 | 4.20 | 4.43 | 3 |
+| b0 (re-judged) | same chats, judged again | 4.62 | 3.95 | 4.25 | 4.32 | 2 |
+| r1 | twin: read the whole chat; venting/excited/debating/closing; no forced habit or joke; register by relationship; `check_reply` flags a long or questioning reply to "gn", advice to a venter, "but" on good news | 4.45 | 3.88 | 4.11 | 4.30 | 5 |
+| r2 | storage: examples keep the 2 earlier same-day turns; `examples(who=name)` returns what you know about that person and your last messages with them; manager files status-now facts (raising, hiring, next) and 2-4 relationship facts per chat partner. Twin: play back when they play; match an unknown sender's register | 4.68 | **4.11** | **4.54** | 4.50 | 4 |
+| r3 | `search` says when nothing it returned is on topic; jokes come from the owner's real life | **4.86** | 4.02 | 4.36 | **4.54** | 2 |
+
+Judge noise: the same chats judged twice move a suite mean by 0.1 to 0.3 and a
+single chat by up to 3 points (of 20). Mood match was 22-24 of 25 in every
+round. The twin laughed (haha/lol/😂) in 0 to 2 of 78 replies.
+
+What each round found:
+- **b0** The worst replies were stalls on things the owner knows ("I'll check
+  where we are on the round"). They were storage misses, not instructions: the
+  manager never filed "not raising" or "hiring one backend engineer" from the
+  update. Also friend-style lowercase sent to investors, borrowed per-person
+  words ("da", "sleep now"), greeting-card comfort, and debate dodged with
+  slogans.
+- **r1** The `human` suite gained (natural 4.19 to 4.50, tone 4.56 to 4.75):
+  closings stayed short, banter turned sincere when the friend did, and the
+  replies to venting stayed off advice. But "don't force humour" over-corrected the `tone` suite (4.50
+  to 3.93): literal answers to jokes ("None. We're 7 people and 112 shops").
+  "Strangers get proper case" also made a keyboard-mashing friend get formal
+  replies.
+- **r2** Status facts landed, so the founder suite rose most (natural 4.12 to
+  4.58). Jokes recovered.
+- **r3** Search now says when nothing matched, and fabrications dropped. The
+  dip in naturalness is within judge noise.
+
+Judge cost: `judge_batch` grades 5 chats per call. The rubric, dossier, samples
+and rules go once per batch, and tool output is de-duplicated across turns and
+capped per block (`brief` never cut). On round b0 that was 56 calls down to 12
+and judge input down 49% (1.53M to 0.79M characters).
+
+Known limits: the twin never sees who a sender is, only their name. So an unknown
+"Rhea" meant as a close friend gets "who's this?", and an unknown investor gets
+casual texting; several low scores are this. Hobbies filed as private never
+reach the professional persona, so "do you still run?" from an ex-colleague has
+no answer to give. The manager decides that filing, not the twin.

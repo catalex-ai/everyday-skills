@@ -34,10 +34,15 @@ SCORES = ("knowledge_accuracy", "persona_fidelity", "naturalness", "tone_read")
 
 
 def load_scenarios(corpus: Path, suite: str, probes: bool) -> list[dict]:
-    out = json.loads((HERE / "scenarios" / f"{suite}.json").read_text(encoding="utf-8"))["scenarios"]
-    for extra in (corpus / "scenarios.json", corpus / f"scenarios-{suite}.json"):
+    """suite: one name or several, comma-separated ("human,tone")."""
+    out = []
+    for name in suite.split(","):
+        out += json.loads((HERE / "scenarios" / f"{name}.json").read_text(encoding="utf-8"))["scenarios"]
+        extra = corpus / f"scenarios-{name}.json"
         if extra.exists():
             out += json.loads(extra.read_text(encoding="utf-8"))["scenarios"]
+    if (corpus / "scenarios.json").exists():
+        out += json.loads((corpus / "scenarios.json").read_text(encoding="utf-8"))["scenarios"]
     if probes and (corpus / "probes.json").exists():
         out += json.loads((corpus / "probes.json").read_text(encoding="utf-8"))
     return out
@@ -46,6 +51,38 @@ def load_scenarios(corpus: Path, suite: str, probes: bool) -> list[dict]:
 def persona_rules(personas: dict) -> dict:
     return {k: f"audience: {v['audience']}\nmay know: {v['include']}\nmust NOT know: {v['exclude']}"
             for k, v in personas.items() if k != "approve"}
+
+
+LAUGH = T.re.compile(r"\b(ha(ha)+|lol|lmao|hehe)\b|[\U0001F602\U0001F923\U0001F606\U0001F604\U0001F605]", T.re.I)
+CLOSE = {"casual": {"casual", "warm", "brief", "playful"}, "brief": {"brief", "casual", "warm"},
+         "warm": {"warm", "casual", "brief", "excited"}, "excited": {"excited", "warm", "playful"},
+         "serious": {"serious", "warm"}, "thoughtful": {"thoughtful", "casual", "professional"},
+         "professional": {"professional"}, "playful": {"playful", "casual"}}
+
+
+def mood_report(judged: list[dict]) -> str:
+    """Does the twin's mood move with the chat? Expected per-turn modes (scenario 'modes') against the
+    judge's label of each reply; the mix of moods; how often it laughs."""
+    exp_n = hit = 0
+    mix: dict[str, int] = {}
+    miss = []
+    for r in judged:
+        got = [str(m).lower().strip() for m in (r.get("judge", {}).get("modes") or [])]
+        for m in got:
+            mix[m] = mix.get(m, 0) + 1
+        for i, want in enumerate(r.get("modes") or []):
+            if i < len(got):
+                exp_n += 1
+                ok = got[i] in CLOSE.get(want, {want})
+                hit += ok
+                if not ok:
+                    miss.append(f"{r['id']} t{i + 1}: wanted {want}, got {got[i]}")
+    reps = [t["reply"] for r in judged for t in r["convo"]]
+    laugh = sum(bool(LAUGH.search(x)) for x in reps)
+    out = [f"Mood match: {hit}/{exp_n}" if exp_n else "Mood match: -",
+           "Mood mix: " + ", ".join(f"{k} {v}" for k, v in sorted(mix.items(), key=lambda x: -x[1])),
+           f"Laughs (haha/lol/😂 in a reply): {laugh}/{len(reps)}"]
+    return "\n".join(out + ([f"- {m}" for m in miss] if miss else []))
 
 
 def report(judged: list[dict]) -> str:
@@ -69,6 +106,7 @@ def report(judged: list[dict]) -> str:
                      + " | ".join(tell_rate(rows, k) for k in ("dont_know", "assistant_phrasing",
                                                               "meta_leak", "markdown"))
                      + f" | {st.median(w) if w else '-'} |")
+    lines += ["", mood_report(judged)]
     fab = [(r["id"], f) for r in judged for f in r.get("judge", {}).get("fabrications", []) or []]
     leaks = [(r["id"], f) for r in judged for f in r.get("judge", {}).get("leaks", []) or []]
     lines += ["", f"Fabrications: {len(fab)}"] + [f"- {i}: {f}" for i, f in fab]
@@ -101,6 +139,8 @@ def main() -> int:
                          "from the stored real messages first (tests voice extraction)")
     ap.add_argument("--twin-model", default="haiku")
     ap.add_argument("--judge-model", default="opus")
+    ap.add_argument("--judge-batch", type=int, default=5,
+                    help="conversations per judge call; shared context is sent once per batch (1 = old way)")
     # ingest options (same as run_round)
     ap.add_argument("--pii", default="~/.twin-corpora/pii/pii.jsonl")
     ap.add_argument("--manager-model", default="haiku")
@@ -171,16 +211,30 @@ def main() -> int:
     if not a.rejudge:
         kept = {}
 
-    def one(s):
+    todo = [s for s in scns if s["id"] not in kept]
+    batches = [todo[i:i + max(1, a.judge_batch)] for i in range(0, len(todo), max(1, a.judge_batch))]
+    verdicts: dict[str, dict] = {}
+
+    def one_batch(group):
+        if a.judge_batch <= 1:
+            s = group[0]
+            return {s["id"]: J.judge(s, convos[s["id"]], dossier, samples, rules[s["persona"]],
+                                     a.judge_model, run, s.get("gold"))}
+        return J.judge_batch([(s, convos[s["id"]]) for s in group], dossier, samples, rules,
+                             a.judge_model, run)
+    with ThreadPoolExecutor(a.jobs) as ex:
+        for v in ex.map(one_batch, batches):
+            verdicts.update(v)
+
+    def row(s):
         if s["id"] in kept:
             return kept[s["id"]]
         c = convos[s["id"]]
-        j = J.judge(s, c, dossier, samples, rules[s["persona"]], a.judge_model, run, s.get("gold"))
-        return {"id": s["id"], "type": s["type"], "persona": s["persona"], "convo": c, "judge": j,
+        return {"id": s["id"], "type": s["type"], "persona": s["persona"], "modes": s.get("modes"),
+                "convo": c, "judge": verdicts[s["id"]],
                 "tells": [T.tells(t["reply"]) for t in c], "words": [T.words(t["reply"]) for t in c],
                 "asked_owner": any(x["name"] == "ask_owner" for t in c for x in t["calls"])}
-    with ThreadPoolExecutor(a.jobs) as ex:
-        judged = list(ex.map(one, scns))
+    judged = [row(s) for s in scns]
     (run / "judged.json").write_text(json.dumps(judged, indent=1, ensure_ascii=False), encoding="utf-8")
     md = report(judged)
     (run / "report.md").write_text(md, encoding="utf-8")

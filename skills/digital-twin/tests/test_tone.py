@@ -38,3 +38,19 @@ def test_errand_half_promise_flagged():
 def test_sarcasm_concede_and_defer_flagged():
     fixes = style.tone_check("Ha, fair point. Let me check on that and get back to you.", "sarcastic")
     assert any("conceding" in f for f in fixes) and any("playing, not asking" in f for f in fixes)
+
+
+def test_closing_gets_a_few_words():
+    assert style.tone_check("gn man", "closing") == []
+    assert any("closing" in f for f in style.tone_check("gn! did you end up taking the job?", "closing"))
+    assert style.tone_check("ha, thanks. you should come by sometime, the office is still a mess", "closing")
+
+
+def test_venting_gets_no_advice():
+    assert style.tone_check("ugh that's so unfair. he's the worst", "venting") == []
+    assert any("venting" in f for f in style.tone_check("that sucks. you should talk to HR", "venting"))
+
+
+def test_good_news_no_but():
+    assert style.tone_check("YESSS. so happy for you", "excited") == []
+    assert style.tone_check("congrats! but make sure you negotiate the notice period", "excited")

@@ -140,6 +140,25 @@ with `write_persona_text(persona, "voice", text)` and `(..., "soul", text)`:
   did not see. Never list catchphrases to repeat.
   If the examples come from a different setting than chat (interviews,
   talks), say so and note that chats are shorter.
+- **Then a "How I play" block** in the same voice text, 4 to 7 lines: the
+  *mechanism* of their humour and tone, so the twin can do it fresh, not
+  repeat it. Look at every example where someone joked, teased, was sarcastic,
+  sent something silly, or wrote formally, and at every example where the
+  owner made a joke. Cover:
+  - what kind of humour it is (deadpan, self-mockery, exaggeration, wordplay,
+    teasing back, mock threats, playing along with an absurd premise, a dry
+    one-liner), with one short real fragment as proof ("haha, my fingers also
+    quit on me");
+  - how they answer someone else's joke or pun (laugh and add to it, groan,
+    roast it, deadpan it);
+  - how they take a jab or sarcasm (dry wit, calm confidence, ignore it) and
+    how sarcastic they are themselves, at whom;
+  - how the register changes with a formal or work message, and how much
+    humour survives there;
+  - when they never joke (bad news, worry).
+  Say how often ("often", "sometimes") and with whom. Only what the examples
+  show; if they show no humour, say "rarely jokes; plays it straight".
+  Never list lines to repeat.
 - **Soul:** 5 to 10 lines in the first person: what they care about, what they
   believe, how they decide, what they will not do, taken from opinions and
   stories. Good: "I'd rather wait for the right hire than hire fast." Bad: "I
@@ -207,7 +226,11 @@ There are three kinds. Word each one yourself, from the slot the tool gives you.
 - **Conflict** asks which of two is right:
   "One source says you moved to Pune in 2018. Another says 2019. Which is right?"
 - **Reply** ("How would you reply? Your sister texts you: ...") fills a gap
-  where there are few real messages to that kind of person. Each answer is
+  where there are few real messages to that kind of person. When you queue
+  your own with `ask_reply`, include moments of tone, not only questions: a
+  friend's terrible pun, a tease about the owner's work, a sarcastic jab from
+  a stranger, a keyboard mash, a formal invite. They show how the owner
+  plays. Each answer is
   filed paired with the message it answers. Real chat history is better: a
   reply written on request is more careful than a real text. See
   "Interrogation" below.

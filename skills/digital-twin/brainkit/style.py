@@ -145,7 +145,7 @@ CHATBOT = [
 
 DEFER = re.compile(r"\b(let me (check|see|think|get back|come back|find out|look)|get back to you|come back to you|"
                    r"circle back|i'?ll (check|confirm|find out)|need to check|longer story|not for text|"
-                   r"over text|on a call|in person|when we (catch up|meet|talk)|ask me (when|in person|on|later)|"
+                   r"over text|on a call|over (coffee|a coffee|chai|drinks)|in person|when we (catch up|meet|talk)|ask me (when|in person|on|later)|"
                    r"same room|another time|tell you the rest)\b")
 # Things a person may really need to look up or decide: time, plans, money,
 # documents, numbers. A holding reply fits these; it does not fit their own life.
@@ -266,6 +266,42 @@ def check(draft: str, incoming: str = "", fp: dict | None = None) -> list[str]:
         fixes.append("I don't use emoji; remove them.")
     if incoming and _restates(draft, incoming):
         fixes.append("Don't repeat their question back; just answer.")
+    return fixes
+
+
+PLAYFUL = {"joking", "joke", "teasing", "tease", "nonsense", "playful", "banter", "pun", "roast"}
+LITERAL = re.compile(r"\b(not sure|off the top of my head|no idea|i'?ll (have to )?(check|find out|look)|"
+                     r"let me (check|see|find|look)|get back to you|come back (to you|on)|noted|let you know|"
+                     r"will (check|see)|i'?ll see if|"
+                     r"what (were|are) you trying to say|didn'?t (catch|get) that)\b")
+LAUGH = re.compile(r"\b(ha(ha)+|lol|lmao|hehe|rofl)\b|[\U0001F602\U0001F923\U0001F606\U0001F61C\U0001F61D\U0001F604\U0001F605]", re.I)
+SLANG = re.compile(r"\b(lol|lmao|bro|dude|yaar|haha+|omg|gonna|wanna|ya)\b", re.I)
+THANKS = re.compile(r"\b(thank(s| you)|appreciate (it|that|you))\b", re.I)
+
+
+def tone_check(draft: str, tone: str = "") -> list[str]:
+    """The twin names the tone it heard; the draft must fit that tone."""
+    t = (tone or "").lower().strip()
+    low = draft.lower()
+    if not t:
+        return []
+    words = set(re.findall(r"[a-z]+", t))
+    fixes = []
+    if words & (PLAYFUL | {"sarcastic"}) and re.match(r"\W*(ha[,.!]?\s*)?fair\b", low):
+        fixes.append("Don't open by conceding ('fair', 'ha, fair'): it's a tic, and it gives in to a jab. "
+                     "Open with your actual comeback or answer.")
+    if words & (PLAYFUL | {"sarcastic"}) and LITERAL.search(low):
+        fixes.append("They're playing, not asking: there is nothing to check or look up. Send a quick witty "
+                     "line in your own humour instead: run with the premise, deadpan it, tease them back or "
+                     "laugh at yourself. Then one real line only if it fits. No 'let me check', no help-desk "
+                     "'what did you mean'.")
+    if "sarcastic" in words and THANKS.search(low):
+        fixes.append("That was sarcasm, not praise. Don't thank them: answer what they mean, with dry wit or "
+                     "calm confidence.")
+    if words & {"sincere", "sad", "grief", "worried"} and LAUGH.search(draft):
+        fixes.append("They're being sincere. No laughing, no jokes: plain, warm, short.")
+    if "formal" in words and SLANG.search(draft):
+        fixes.append("They wrote formally. Match it: no slang or haha, courteous and clear.")
     return fixes
 
 

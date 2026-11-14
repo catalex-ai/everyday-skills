@@ -55,3 +55,14 @@ must_not_know, reply, tool_text}`. It prints a markdown report and writes
 - miss stages: `not_retrieved`, `answered_wrong`, `leaked`
 
 Tests: `cd skills/digital-twin && .venv/bin/pytest -q tests/test_score.py`
+
+## 6. Tone suite
+
+    python evals/run_convo.py --corpus ~/.twin-corpora/<name> --suite tone --round t1 \
+        --reuse-brain <TWIN_HOME> --no-probes [--revoice]
+
+Jokes, puns, sarcasm, teasing, nonsense, formal and sincere messages
+(`scenarios/tone.json`), plus `<corpus>/scenarios-tone.json` if present (puns on
+the owner's own name or work; kept outside the repo). The judge adds
+`tone_read`. `--revoice` has the manager rewrite every persona's voice (with
+its "How I play" block) from the stored real messages first.

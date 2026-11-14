@@ -85,3 +85,40 @@ about 5 of 62 replies in round 3, 1 of 62 in round 8.
 .venv/bin/python evals/fetch_corpus.py --seed <WIKIDATA_QID> --out ~/.twin-corpora/subject-a   # see evals/README.md
 .venv/bin/python evals/run_round.py --corpus ~/.twin-corpora/subject-a --round N --questions 30
 ```
+
+# Tone hill-climb: jokes, sarcasm, teasing, register
+
+The twin answered jokes as lookups. Asked a pun on the owner's company name
+("how many X in <company>?") it said "not sure off the top of my head, let me
+check", and it promised to "check and come back" on a grocery errand texted to
+the wrong chat. The tone rounds fix that.
+
+Setup: suite `tone` (14 generic chats in `evals/scenarios/tone.json`, plus two
+puns per corpus on the owner's own name or work in
+`<corpus>/scenarios-tone.json`, outside the repo), three public-figure
+corpora, twin and manager on **Haiku**, Opus judge v8 with a new fourth score,
+`tone_read`: did it hear what the person was doing (joke, pun, tease,
+sarcasm, nonsense, formal, sincere) and answer at that level, in the owner's
+own kind of humour. Sincere bad news and a formal invite are controls: a joke
+there scores low.
+
+| Round | Change | tone_read | natural | persona | knowledge |
+|---|---|---|---|---|---|
+| t0 | baseline | 3.77 | 3.90 | 3.31 | 4.48 |
+| t1 | twin: "hear them" step (name the tone, a joke is not a lookup), tone moves; `check_reply(tone=...)` flags holding replies to jokes, thanking sarcasm, laughing at sad news, slang in formal replies; manager: writes a "How I play" block (the *mechanism* of the owner's humour) from real messages | 4.21 | 4.02 | 3.56 | 4.44 |
+| t2 | twin: errands out of the blue are `nonsense`; let them land their own riddle; no repeated joke; reply in their language mix (Hinglish); nothing after the checked draft | 4.27 | 4.31 | 3.79 | 4.56 |
+| t3 | no "ha, fair" concession to a jab; sarcasm with a real question gets the answer, never "let me check". End to end: manager re-extracts voice from scratch | **4.33** | 4.21 | 3.81 | 4.56 |
+
+Means over three corpora, 16 chats each. t0 to t2 differ by one change set
+each; t3 re-runs the manager's voice extraction, so it carries that variance too.
+
+What the manager extracts now (one corpus, abridged): "Mostly self-mockery
+and exaggeration of his own image... Plays along with an absurd premise, then
+adds a dry twist... Answers a friend's jab by roasting back, not by
+groaning." For a corpus with little humour it writes "Rarely jokes; mostly
+plays it straight", and the twin stays straighter there (lowest tone_read,
+4.00), which is the right call.
+
+Known limits: the twin sometimes plays along with a sceptic's exaggeration
+instead of correcting it deadpan, and a first name that matches a relative
+("Maya") can still be taken for that relative.

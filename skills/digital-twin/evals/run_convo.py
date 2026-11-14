@@ -30,14 +30,14 @@ import judge as J  # noqa: E402
 import run_round as R  # noqa: E402
 import tells as T  # noqa: E402
 
-SCORES = ("knowledge_accuracy", "persona_fidelity", "naturalness")
+SCORES = ("knowledge_accuracy", "persona_fidelity", "naturalness", "tone_read")
 
 
 def load_scenarios(corpus: Path, suite: str, probes: bool) -> list[dict]:
     out = json.loads((HERE / "scenarios" / f"{suite}.json").read_text(encoding="utf-8"))["scenarios"]
-    extra = corpus / "scenarios.json"
-    if extra.exists():
-        out += json.loads(extra.read_text(encoding="utf-8"))["scenarios"]
+    for extra in (corpus / "scenarios.json", corpus / f"scenarios-{suite}.json"):
+        if extra.exists():
+            out += json.loads(extra.read_text(encoding="utf-8"))["scenarios"]
     if probes and (corpus / "probes.json").exists():
         out += json.loads((corpus / "probes.json").read_text(encoding="utf-8"))
     return out
@@ -57,8 +57,8 @@ def report(judged: list[dict]) -> str:
         reps = [t for r in rows for t in r["tells"]]
         return f"{sum(t[k] for t in reps)}/{len(reps)}" if reps else "-"
 
-    lines = ["| group | n | knowledge | persona | natural | dont_know | assistant | meta | markdown | words |",
-             "|---|---|---|---|---|---|---|---|---|---|"]
+    lines = ["| group | n | knowledge | persona | natural | tone | dont_know | assistant | meta | markdown | words |",
+             "|---|---|---|---|---|---|---|---|---|---|---|"]
     groups: dict[str, list] = {"ALL": judged}
     for r in judged:
         for t in r["type"]:
@@ -77,7 +77,7 @@ def report(judged: list[dict]) -> str:
     for r in judged:
         j = r.get("judge", {})
         lines.append(f"### {r['id']} K{j.get('knowledge_accuracy')} P{j.get('persona_fidelity')} "
-                     f"N{j.get('naturalness')}  ({', '.join(r['type'])}; {r['persona']})")
+                     f"N{j.get('naturalness')} T{j.get('tone_read')}  ({', '.join(r['type'])}; {r['persona']})")
         for t in r["convo"]:
             lines.append(f"> {t['msg']}\n\n{t['reply']}\n\n`tools: {', '.join(c['name'] for c in t['calls'])}`")
         lines.append(f"\n*Judge:* {j.get('summary', j.get('error'))}\n")
@@ -96,6 +96,9 @@ def main() -> int:
     ap.add_argument("--missing", action="store_true",
                     help="with --rejudge: only judge chats with no current-version score (saves calls)")
     ap.add_argument("--jobs", type=int, default=4)
+    ap.add_argument("--revoice", action="store_true",
+                    help="with --reuse-brain: have the manager rewrite every persona's voice and soul "
+                         "from the stored real messages first (tests voice extraction)")
     ap.add_argument("--twin-model", default="haiku")
     ap.add_argument("--judge-model", default="opus")
     # ingest options (same as run_round)
@@ -128,6 +131,9 @@ def main() -> int:
         brain = run / "brain"
         env = {**os.environ, "TWIN_HOME": str(brain)}
         R.cli(env, "rebuild")  # persona files from the current build code
+        if a.revoice:
+            R.manager(env, "Rewrite the voice and soul of every persona from my real messages, "
+                           "following your skill, then sync.", a.manager_model, run / "revoice.jsonl")
     else:
         brain = run / "brain"
         env = {**os.environ, "TWIN_HOME": str(brain)}

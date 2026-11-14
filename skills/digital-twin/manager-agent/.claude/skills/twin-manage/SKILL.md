@@ -122,6 +122,27 @@ Rules for examples:
   A message that mentions family goes under the family category, so it reaches
   only personas that may know about family.
 
+**Relationship memory.** The twin chats with these people again. For every
+person the owner chats with, add 2 to 4 `fact` items about them (`about` =
+their name, the category that fits the most private thing in it), taken from
+the chat:
+- who they are to the owner, if not already filed ("Rohan Kulkarni is my
+  closest friend from college");
+- what is going on in their life now, with the month ("Rohan was offered a job
+  in Bangalore in October 2026", "Tanvi was laid off in September 2026 and got
+  a fintech offer in October");
+- what the two of them joke or talk about, and how they text each other
+  ("Rohan and I tease each other about RCB, my running and my cooking; we
+  text in lowercase").
+Only what the chat shows. Never invent a running joke.
+
+**Status now.** From every update, post or chat, also file what is true *now*
+as plain facts with `since`: whether the owner is raising and roughly when,
+whether they are hiring and for what, what they are working on next, what
+just happened (a demo, a launch, a hire). "Not raising right now" and "not
+hiring" are facts too. These are what people ask about most; the twin must
+never have to say "let me check" about them.
+
 **After adding the owner's own words, call `make_foils`.** It writes, for each
 real message, the polished version a bot would have sent, so the twin can see
 what not to sound like. It takes a minute; tell the owner you're doing it. Call

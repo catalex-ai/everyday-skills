@@ -14,7 +14,7 @@ import re
 import subprocess
 from pathlib import Path
 
-JUDGE_VERSION = 8
+JUDGE_VERSION = 9
 
 # How long real WhatsApp messages are (Ben-Gurion/Hebrew U. study of 6M+ messages: a third are 1-2 words,
 # another third 3-5, under 4% over 20; mean 5-6.5 words. IM studies (Baron; Ling & Baron): ~5-6 words per
@@ -109,6 +109,9 @@ tone_read (did it hear what the person was doing, and answer at that level?):
    reply to teasing.
  1 badly misread: jokes about bad news, or a robotic/defensive reply to banter.
  If no turn has any tone to read (plain factual questions), score how well the register fit: usually 4-5.
+ A person's mood moves with the chat. Stuck in one mood is a misread: jokes or "haha" in every turn, a joke
+ forced into a plain question, staying playful after they turn sincere, heavy or formal with a friend's light
+ message, or a long reply to a closing "gn" or a thumbs-up. Each of these: tone_read <= 3.
 
 HARD CAPS:
  - Claims not to know, needs to check, or will "get back"/"tell you on a call" about something any real person
@@ -125,10 +128,13 @@ HARD CAPS:
 Also list: fabrications (invented personal claims), wrong_facts, leaks (persona must not know),
 chatbot_tells (quote the phrase), and for each turn a one-line note saying what the owner would have said instead.
 
+Also label the MOOD of each twin reply, one word per turn, from: playful, casual, warm, excited, serious,
+thoughtful, professional, brief ("brief" = a closing or acknowledgement of a few words).
+
 Reply with JSON only:
 {"knowledge_accuracy": n, "persona_fidelity": n, "naturalness": n, "tone_read": n,
  "fabrications": [], "wrong_facts": [], "leaks": [], "chatbot_tells": [],
- "turn_notes": [], "summary": "one or two lines"}"""
+ "turn_notes": [], "modes": [], "summary": "one or two lines"}"""
 
 
 def _ask(prompt: str, model: str, cwd: Path) -> str:
@@ -192,6 +198,75 @@ def judge(scn: dict, convo: list[dict], dossier: str, samples: str, persona_rule
             j["judge_version"] = JUDGE_VERSION
             return j
     return {"error": "judge failed"}
+
+
+KEYS = ("knowledge_accuracy", "persona_fidelity", "naturalness", "tone_read")
+# Per block, after dropping blocks the judge already saw in an earlier turn. brief() holds the owner's
+# life card, which grounds most claims, so it is never cut; examples() are voice, not facts.
+BLOCK_CAP = {"brief": 100000, "search": 3000, "walk": 3000, "page": 3000, "examples": 1200}
+
+
+def _tool_text(convo: list[dict]) -> list[str]:
+    """Per turn tool output without repeats from earlier turns, each block capped by kind."""
+    seen, out = set(), []
+    for t in convo:
+        blocks = [b for b in (t.get("tool_text") or "").split("\n---\n") if b.strip()]
+        fresh = []
+        for b in blocks:
+            if b in seen:
+                continue
+            seen.add(b)
+            kind = b[1:b.find("]")] if b.startswith("[") else ""
+            cap = BLOCK_CAP.get(kind, 2000)
+            fresh.append(b[:cap] + (" [...]" if len(b) > cap else ""))
+        out.append("\n---\n".join(fresh) if fresh else
+                   ("(same as earlier turns)" if blocks else "(none)"))
+    return out
+
+
+def judge_batch(items: list[tuple[dict, list[dict]]], dossier: str, samples: str, persona_rules: dict,
+                model: str, cwd: Path) -> dict[str, dict]:
+    """Judge several conversations in one call: the rubric, dossier, samples, persona rules and owner
+    rules are sent once for the group instead of once per conversation. Each conversation is still
+    scored on its own. Returns {scenario id: judgement}; ids the judge skipped are retried alone."""
+    blocks = []
+    for scn, convo in items:
+        lines = [f"### CONVERSATION id={scn['id']}",
+                 f"who is writing: {scn['from']['name']}, {scn['from']['role']} (persona: {scn['persona']})",
+                 f"types: {', '.join(scn['type'])}", f"expected behaviour: {scn['expect']}"]
+        if scn.get("gold"):
+            lines.append(f"the owner's REAL answer (compare style and thinking, not wording): {scn['gold']}")
+        for i, (t, tt) in enumerate(zip(convo, _tool_text(convo)), 1):
+            lines.append(f"--- turn {i}\n{scn['from']['name']}: {t['msg']}\nTOOL OUTPUT the twin saw:\n{tt}\n"
+                         f"TWIN REPLY: {t['reply']}")
+        blocks.append("\n".join(lines))
+    rules = "\n".join(f"[{k}]\n{v}" for k, v in persona_rules.items())
+    rubric = RUBRIC.rsplit("Reply with JSON only:", 1)[0]
+    prompt = (f"{rubric}\nYou will grade {len(items)} SEPARATE conversations. Grade each one on its own, as if it were "
+              f"the only one; do not compare them or let one affect another's scores.\n\n"
+              f"=== DOSSIER (ground truth about the owner; the twin did NOT see this) ===\n{dossier}\n\n{WHATSAPP}\n\n"
+              f"=== REFERENCE SAMPLES (the owner's real words) ===\n{samples}\n{typical_length(samples)}\n\n"
+              f"=== WHAT EACH PERSONA MAY KNOW ===\n{rules}\n\n"
+              f"=== OWNER'S REPLY RULES (the twin follows these) ===\n{OWNER_RULES}\n\n"
+              + "\n\n".join(blocks) +
+              '\n\nReply with JSON only: {"results": [{"id": "<conversation id>", "knowledge_accuracy": n, '
+              '"persona_fidelity": n, "naturalness": n, "tone_read": n, "fabrications": [], "wrong_facts": [], '
+              '"leaks": [], "chatbot_tells": [], "turn_notes": ["short"], "modes": ["one word per turn"], '
+              '"summary": "one line"}, ...]} with one entry per conversation, in order.')
+    out: dict[str, dict] = {}
+    for _ in range(2):
+        j = parse(_ask(prompt, model, cwd))
+        for r in (j or {}).get("results", []) if isinstance(j, dict) else []:
+            if isinstance(r, dict) and all(k in r for k in KEYS) and r.get("id"):
+                r["judge_version"] = JUDGE_VERSION
+                out[r["id"]] = r
+        if all(s["id"] in out for s, _ in items):
+            break
+    for scn, convo in items:  # a skipped conversation is judged alone
+        if scn["id"] not in out:
+            rule = persona_rules.get(scn["persona"], "")
+            out[scn["id"]] = judge(scn, convo, dossier, samples, rule, model, cwd, scn.get("gold"))
+    return out
 
 
 PAIR_RUBRIC = """You compare two replies to the same WhatsApp message. Each was written as the owner (a real person).

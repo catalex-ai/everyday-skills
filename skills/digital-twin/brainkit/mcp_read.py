@@ -176,7 +176,37 @@ def search(q: str) -> str:
             break
         out.append(p[:MAX_CHARS])
         total += len(p) + 1
-    return "\n".join(out) + "\n\n" + REPLY_HINT
+    miss = _off_topic(q, "\n".join(out))
+    return "\n".join(out) + "\n\n" + (OFF_TOPIC_HINT if miss else REPLY_HINT)
+
+
+OFF_TOPIC_HINT = ("(None of these lines is about what you searched for: your memory has nothing on that. Don't fill the "
+                  "gap: no habit, feeling or detail about yourself that isn't written here. If it is about "
+                  "you, follow the 'missing' move; if it is a general topic, answer from general knowledge.)")
+
+
+def _stem(w: str) -> str:
+    w = w.lower()
+    for suf in ("ing", "ed", "es", "s"):
+        if len(w) > len(suf) + 2 and w.endswith(suf):
+            w = w[: -len(suf)]
+            break
+    if len(w) > 3 and w[-1] == w[-2]:
+        w = w[:-1]
+    return w
+
+
+def _off_topic(q: str, found: str) -> list[str]:
+    """The query's content words when not one of them shows up in what search returned (so the
+    results are only the nearest neighbours of nothing). Empty when anything matches."""
+    qw = {_stem(w) for w in style._words(q) if len(w) > 2 and w.lower() not in style.STOP
+          and w.lower() not in AUDIENCE_NOISE}
+    if not qw:
+        return []
+    fw = {_stem(w) for w in style._words(found) if len(w) > 2}
+    hit = any(a == b or (min(len(a), len(b)) >= 4 and (a.startswith(b) or b.startswith(a)))
+              for a in qw for b in fw)
+    return [] if hit else sorted(qw)
 
 
 def _named_page(e: dict, q: str) -> str:
@@ -279,6 +309,41 @@ def _varied(aud: list[dict], rank: dict, k: int) -> list[dict]:
 SAYS = re.compile(r"^(?P<who>.{1,80}?) (?:says|said|asks|asked|writes|wrote|texts|texted): (?P<msg>.+)$", re.S)
 
 
+PERSON_FACTS = 5
+PERSON_MSGS = 3
+
+
+def _person(e: dict, who: str) -> str:
+    """What you know about the one person named in `who`, and your last few messages with them:
+    the relationship memory a person brings to a chat with someone they know. Empty when `who`
+    names nobody you know, or more than one person matches."""
+    words = {w for w in _who_words(who) if w not in AUDIENCE_NOISE}
+    if not words:
+        return ""
+    names: dict[str, list[dict]] = {}
+    for f in e["facts"]:
+        a = str(f.get("about") or "")
+        if a and a != "me" and _norm_words(a.split()[0]) & words:
+            names.setdefault(a, []).append(f)
+
+    def chats(name: str) -> list[dict]:  # only people you have real messages with
+        first = name.split()[0].lower()
+        return [x for x in e["examples"].values() if f"({first})" in (x.get("context") or "").lower()]
+    people = {n: chats(n) for n in names}
+    people = {n: c for n, c in people.items() if c}
+    if len(people) != 1:
+        return ""
+    name, mine = next(iter(people.items()))
+    first = name.split()[0]
+    facts = sorted(names[name], key=lambda f: (str(f.get("since") or ""), f.get("created") or ""), reverse=True)
+    lines = [f"- {f['text']}" for f in facts[:PERSON_FACTS]]
+    recent = [_pair(x) for x in mine[-PERSON_MSGS:]]
+    out = f"You and {name} (what you know; bring it up only if it fits this moment):\n" + "\n".join(lines)
+    if recent:
+        out += f"\n\nYour last messages with {first}:\n" + "\n\n".join(recent)
+    return out
+
+
 def _pair(x: dict, foil: bool = False) -> str:
     """One real exchange: what they said, then what you sent. With foil: also the
     generic AI version of the same reply, marked as what not to send."""
@@ -328,7 +393,10 @@ def examples(q: str, who: str = "") -> str:
             f"(No messages to them ({who}) yet: match how they write to you, and how you'd talk to "
             "that kind of person.)\n\n")
     size = _length_hint(near) if matched else ""
-    return (head + "\n\n".join(out))[:MAX_CHARS] + (f"\n\n{size}" if size else "") + (
+    person = _person(e, who)
+    if person:
+        head = person + "\n\n---\n" + head
+    return (head + "\n\n".join(out))[:MAX_CHARS + len(person)] + (f"\n\n{size}" if size else "") + (
         ("\n\n(✗ lines are the generic version of the same reply: everything that makes them sound like a "
          "bot, you don't do.)" if any(x.get("foil") for x in picked[:3]) else "") +
         "\n\n(How you sound with this kind of person: length, capitals, rhythm, words, humour. "
@@ -361,7 +429,7 @@ def ask_owner(question: str, who: str = "") -> str:
 def check_reply(draft: str, their_message: str = "", who: str = "", tone: str = "") -> str:
     """Check a draft reply before you send it. who: the relationship, as for examples().
     tone: what they are doing, in one word: asking, joking, teasing, sarcastic, nonsense,
-    formal or sincere. Returns what to fix, or OK."""
+    formal, sincere, venting, excited, debating or closing. Returns what to fix, or OK."""
     try:
         e = _load()
     except _Unavailable:

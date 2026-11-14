@@ -41,3 +41,23 @@ def test_interview_notes():
     assert p[1]["they"] == "And now?" and p[1]["they_who"] == "interviewer"
     assert messages.context("journalist", "interviewer", "And now?") == "journalist says: And now?"
     assert messages.context("close friend", "Dev", "alive?") == "close friend (Dev) says: alive?"
+
+
+THREAD = """[22/07/2026, 22:40] Rohan: bro do you even have friends anymore
+[22/07/2026, 22:41] Asha: i have you. that's the list
+[22/07/2026, 22:42] Rohan: no but seriously. are you ok?
+[22/07/2026, 22:43] Asha: honestly, tired. the launch slipped again
+[23/07/2026, 08:00] Rohan: gn was yesterday, gm now
+[23/07/2026, 08:01] Asha: gm
+"""
+
+
+def test_thread_keeps_earlier_turns_same_day():
+    p = messages.pairs(THREAD, "Asha")
+    assert "earlier" not in p[0]
+    assert p[1]["they"] == "no but seriously. are you ok?"
+    assert p[1]["earlier"] == ["Rohan: bro do you even have friends anymore", "me: i have you. that's the list"]
+    assert "earlier" not in p[2]  # a new day starts a new thread
+    ctx = messages.context("close friend", "Rohan", p[1]["they"], p[1]["earlier"])
+    assert ctx.startswith("close friend (Rohan) says: (just before: Rohan: bro")
+    assert ctx.endswith("are you ok?")

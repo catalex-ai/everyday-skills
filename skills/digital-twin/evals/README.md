@@ -66,3 +66,19 @@ Jokes, puns, sarcasm, teasing, nonsense, formal and sincere messages
 the owner's own name or work; kept outside the repo). The judge adds
 `tone_read`. `--revoice` has the manager rewrite every persona's voice (with
 its "How I play" block) from the stored real messages first.
+
+## 7. Human suite and batched judging
+
+    python evals/run_convo.py --corpus ~/.twin-corpora/<name> --suite human,tone,founder --round r1 \
+        --reuse-brain <TWIN_HOME> --no-probes [--judge-batch 5]
+
+`--suite` takes several suites, comma-separated. `scenarios/human.json` covers
+callbacks, debate, venting, humour covering bad news, good news, closing, a
+bare thumbs-up, the same question from a friend and an investor, ambiguity, a
+topic change, banter that turns sincere, a polite no and worry. Each turn has
+an expected mood (`modes`). The judge labels the mood of every reply, and the
+report prints the mood match, the mix of moods and how often the twin laughs.
+
+`--judge-batch N` (default 5) grades N chats per Opus call. Shared context goes
+once per batch and each chat is still scored on its own; a chat the judge
+skips is re-judged alone. `--judge-batch 1` is the old one-call-per-chat judge.

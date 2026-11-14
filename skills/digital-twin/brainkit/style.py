@@ -302,7 +302,20 @@ def tone_check(draft: str, tone: str = "") -> list[str]:
         fixes.append("They're being sincere. No laughing, no jokes: plain, warm, short.")
     if "formal" in words and SLANG.search(draft):
         fixes.append("They wrote formally. Match it: no slang or haha, courteous and clear.")
+    n = len(draft.split())
+    if words & CLOSING and ("?" in draft or n > 10):
+        fixes.append("They're closing the chat. Let it end: a few words or an emoji, no question, no new topic.")
+    if words & {"venting", "vent"} and ADVICE.search(low):
+        fixes.append("They're venting: they want to be heard, not advised. Take their side in a few words; "
+                     "drop the advice.")
+    if words & {"excited", "celebrating"} and (n > 25 or re.search(r"\bbut\b", low)):
+        fixes.append("It's good news. Be glad, short: no 'but', no advice, under ~20 words.")
     return fixes
+
+
+CLOSING = {"closing", "close", "bye", "ack", "acknowledging"}
+ADVICE = re.compile(r"\b(you should|you could|maybe (try|you)|have you (tried|thought)|try to|my advice|"
+                    r"i'?d (suggest|recommend)|next time)\b")
 
 
 STOCK_OPENERS = ("honest answer", "fair question", "great question", "that means a lot", "good question",

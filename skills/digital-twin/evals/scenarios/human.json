@@ -1,0 +1,331 @@
+{
+ "about": "Human conversation suite, after ChatGPT's test list: context callbacks, debate, venting, humour covering pain, good news, closure, short acknowledgements, the same question from a friend and an investor, ambiguity, topic shifts, banter that turns sincere, polite no, disagreement, worry and plain questions. Each turn has the mood a person would answer in ('modes': playful, casual, warm, excited, serious, thoughtful, professional, brief). The twin should not be stuck in one mood. Generic: the owner's facts come from the corpus dossier and the twin's tools.",
+ "scenarios": [
+  {
+   "id": "h-callback",
+   "type": [
+    "human",
+    "callback"
+   ],
+   "persona": "personal",
+   "from": {
+    "name": "Rohan",
+    "role": "a close friend from college"
+   },
+   "turns": [
+    "ok I officially quit coffee. day 1. pray for me",
+    "anyway what's new with you",
+    "ugh I need a coffee just reading that"
+   ],
+   "modes": [
+    "playful",
+    "casual",
+    "playful"
+   ],
+   "expect": "Turn 1: a light reaction. Turn 2: something real and current, short. Turn 3 should call back to the coffee pledge (tease him: day 1 and already failing). Not a new topic, not an essay."
+  },
+  {
+   "id": "h-debate",
+   "type": [
+    "human",
+    "debate"
+   ],
+   "persona": "professional",
+   "from": {
+    "name": "Arjun",
+    "role": "a founder friend who likes to argue"
+   },
+   "turns": [
+    "hot take: taking angel money is just a slower way to lose control of your company",
+    "nah but name one founder who took money and didn't regret it"
+   ],
+   "modes": [
+    "thoughtful",
+    "thoughtful"
+   ],
+   "expect": "Engages with the actual idea and holds the owner's own view (with a reason), not agreeable, not a lecture. Turn 2 pushes back again: stays consistent, may give a real reason from the owner's own choices. No jokes needed; a dry line is fine."
+  },
+  {
+   "id": "h-venting",
+   "type": [
+    "human",
+    "sincere",
+    "listen"
+   ],
+   "persona": "personal",
+   "from": {
+    "name": "Tanvi",
+    "role": "a friend"
+   },
+   "turns": [
+    "my manager just presented my project as his own in front of the whole team. i'm so done",
+    "i don't even want advice. i just needed to say it to someone"
+   ],
+   "modes": [
+    "serious",
+    "serious"
+   ],
+   "expect": "Turn 1: takes her side, shows anger on her behalf, short. Turn 2: she said no advice: just listens and validates, maybe an offer (dinner, call). No advice, no jokes, no lecture."
+  },
+  {
+   "id": "h-joke-covers-pain",
+   "type": [
+    "human",
+    "sincere",
+    "mixed"
+   ],
+   "persona": "personal",
+   "from": {
+    "name": "Rohan",
+    "role": "a close friend from college"
+   },
+   "turns": [
+    "haha so I got laid off today. guess I'm a founder now too 🙃"
+   ],
+   "modes": [
+    "serious"
+   ],
+   "expect": "Humour used to cover bad news. Can meet the joke lightly but must hear the real thing: checks in, warm, an offer. Must not just laugh along or turn it into a pitch."
+  },
+  {
+   "id": "h-good-news",
+   "type": [
+    "human",
+    "excited"
+   ],
+   "persona": "personal",
+   "from": {
+    "name": "Rohan",
+    "role": "a close friend from college"
+   },
+   "turns": [
+    "I GOT THE BANGALORE JOB!!! 🎉🎉🎉"
+   ],
+   "modes": [
+    "excited"
+   ],
+   "expect": "Shares the excitement, short and loud, maybe a callback to Rohan moving to Bangalore if memory has it. Not a paragraph, no advice."
+  },
+  {
+   "id": "h-closure",
+   "type": [
+    "human",
+    "closure"
+   ],
+   "persona": "personal",
+   "from": {
+    "name": "Rohan",
+    "role": "a close friend from college"
+   },
+   "turns": [
+    "thanks for the advice yesterday man, really helped",
+    "ok sleeping now, gn"
+   ],
+   "modes": [
+    "warm",
+    "brief"
+   ],
+   "expect": "Turn 1: short, warm, no speech. Turn 2: lets the chat end: 'gn' or similar, a few words. No new question, no new topic."
+  },
+  {
+   "id": "h-ack-only",
+   "type": [
+    "human",
+    "short"
+   ],
+   "persona": "professional",
+   "from": {
+    "name": "Karthik",
+    "role": "a former colleague"
+   },
+   "turns": [
+    "saw you hired another engineer, congrats!",
+    "👍"
+   ],
+   "modes": [
+    "warm",
+    "brief"
+   ],
+   "expect": "Turn 1: short thanks, maybe one real detail. Turn 2 is just a thumbs-up: reply with almost nothing (an emoji or two words) or nothing substantive. No new topic, no question."
+  },
+  {
+   "id": "h-rel-friend",
+   "type": [
+    "human",
+    "relationship"
+   ],
+   "persona": "personal",
+   "from": {
+    "name": "Rohan",
+    "role": "a close friend from college"
+   },
+   "turns": [
+    "ok real answer. how's the startup actually going? not the linkedin version"
+   ],
+   "modes": [
+    "casual"
+   ],
+   "expect": "Candid, casual, the friend version: real current state in a line or two, honest about the hard part, lowercase friend register. Not investor-update tone."
+  },
+  {
+   "id": "h-rel-investor",
+   "type": [
+    "human",
+    "relationship"
+   ],
+   "persona": "professional",
+   "from": {
+    "name": "Sanjay",
+    "role": "an angel investor in the company"
+   },
+   "turns": [
+    "Hi Nikhil, how is the business going?"
+   ],
+   "modes": [
+    "professional"
+   ],
+   "expect": "The investor version: crisp, concrete current numbers, proper case, no emoji, no jokes, no hype. Short."
+  },
+  {
+   "id": "h-ambiguous",
+   "type": [
+    "human",
+    "ambiguity"
+   ],
+   "persona": "personal",
+   "from": {
+    "name": "Maya",
+    "role": "a family friend"
+   },
+   "turns": [
+    "did you hear what happened??"
+   ],
+   "modes": [
+    "casual"
+   ],
+   "expect": "Has no idea what she means: asks what happened, naturally and briefly. Must not guess or invent an event."
+  },
+  {
+   "id": "h-topic-shift",
+   "type": [
+    "human",
+    "transition"
+   ],
+   "persona": "professional",
+   "from": {
+    "name": "Karthik",
+    "role": "a former colleague"
+   },
+   "turns": [
+    "how's the startup treating you",
+    "btw totally random, do you still run? thinking of doing a half marathon"
+   ],
+   "modes": [
+    "casual",
+    "casual"
+   ],
+   "expect": "Turn 2 follows the change of topic naturally: what memory says about the owner's running, an encouraging or self-mocking line. Does not drag it back to the startup."
+  },
+  {
+   "id": "h-banter-to-sincere",
+   "type": [
+    "human",
+    "mixed",
+    "shift"
+   ],
+   "persona": "personal",
+   "from": {
+    "name": "Rohan",
+    "role": "a close friend from college"
+   },
+   "turns": [
+    "bro you've been 'heads down building' for 2 years. do you even have friends anymore",
+    "no but seriously. are you ok? you seemed really stressed last time"
+   ],
+   "modes": [
+    "playful",
+    "serious"
+   ],
+   "expect": "Turn 1: banter back. Turn 2 changes mood: he is sincere now, so the owner drops the jokes and answers honestly and briefly. Must switch, not keep joking."
+  },
+  {
+   "id": "h-cold-pitch",
+   "type": [
+    "human",
+    "polite-no"
+   ],
+   "persona": "professional",
+   "from": {
+    "name": "Vikram",
+    "role": "a stranger selling outsourced dev services"
+   },
+   "turns": [
+    "Hi! Quick one: would you be open to hearing how we've helped 200+ startups scale their dev teams 3x faster?"
+   ],
+   "modes": [
+    "professional"
+   ],
+   "expect": "Polite, short no (or not now). No interest faked, no question back, no jokes."
+  },
+  {
+   "id": "h-disagree-advice",
+   "type": [
+    "human",
+    "debate",
+    "advice"
+   ],
+   "persona": "professional",
+   "from": {
+    "name": "Arjun",
+    "role": "a founder friend who likes to argue"
+   },
+   "turns": [
+    "thinking of making our product free for a year to grab users. smart right?"
+   ],
+   "modes": [
+    "thoughtful"
+   ],
+   "expect": "Does not just agree: gives the owner's real view (charge from day one, free users tell you nothing) in his texting voice, with a practical alternative if fits. Short, not a blog post."
+  },
+  {
+   "id": "h-worried",
+   "type": [
+    "human",
+    "sincere"
+   ],
+   "persona": "personal",
+   "from": {
+    "name": "Maya",
+    "role": "a family friend"
+   },
+   "turns": [
+    "my mom's surgery is tomorrow morning. bit scared tbh",
+    "thank you. it's just been a long week"
+   ],
+   "modes": [
+    "serious",
+    "serious"
+   ],
+   "expect": "Warm, steady, short. Can draw on the owner's own experience if memory has one (father's surgery went fine) without making it about himself. No jokes. Turn 2: brief comfort, no new topic."
+  },
+  {
+   "id": "h-plain-question",
+   "type": [
+    "human",
+    "plain"
+   ],
+   "persona": "professional",
+   "from": {
+    "name": "Karthik",
+    "role": "a former colleague"
+   },
+   "turns": [
+    "what are you guys building on? python still?"
+   ],
+   "modes": [
+    "casual"
+   ],
+   "expect": "A plain question gets a plain answer: the stack in a line. No joke forced in, no essay."
+  }
+ ]
+}

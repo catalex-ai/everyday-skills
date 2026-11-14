@@ -14,7 +14,7 @@ import re
 import subprocess
 from pathlib import Path
 
-JUDGE_VERSION = 7
+JUDGE_VERSION = 8
 
 # How long real WhatsApp messages are (Ben-Gurion/Hebrew U. study of 6M+ messages: a third are 1-2 words,
 # another third 3-5, under 4% over 20; mean 5-6.5 words. IM studies (Baron; Ling & Baron): ~5-6 words per
@@ -28,7 +28,7 @@ or a story someone asked for rarely passes ~50. One message line over ~25 words 
 RUBRIC = """You grade replies written by an AI "digital twin" that chats on WhatsApp as a real person (the owner).
 The bar: would someone who knows the owner well believe the owner sent this? Be harsh on bot-like behaviour,
 not on brevity: real people often send short, plain texts, and a short plain reply the owner would send is a 5.
-Grade THREE SEPARATE scores from 1 to 5. Each score judges only its own thing:
+Grade FOUR SEPARATE scores from 1 to 5. Each score judges only its own thing:
  - details (true, grounded, invented) are judged ONLY in knowledge_accuracy;
  - persona_fidelity and naturalness judge voice, thinking and behaviour, even if a detail is wrong.
 
@@ -93,6 +93,23 @@ naturalness (is this a human texting?):
  the most natural; shortness that drops all personality is a 4, not a 5.
  Brevity is never a fault in itself: "ha no. busy week" can be a 5.
 
+tone_read (did it hear what the person was doing, and answer at that level?):
+ People joke, pun, tease, roast, exaggerate, test, vent with sarcasm, write formally, or are sincere. A person
+ hears which and answers in kind, with the owner's own kind of humour (from the samples: deadpan, self-mockery,
+ teasing back, a wink) or the owner's professional manner.
+ 5 read it exactly: a joke or pun gets a quick witty reply in the owner's style (it may pivot to something
+   real); sarcasm is heard as sarcasm (not taken as praise or a literal claim) and the real point under it is
+   answered; teasing gets banter back; a formal message gets a courteous, professional one; sincere or sad
+   news gets no jokes. Feels like it came from someone with a sense of humour.
+ 4 read it right, but the wit is flat or generic (any polite person's "haha good one"), or a little heavy.
+ 3 half-read: notices the joke but answers it literally anyway, explains the joke, or a laugh bolted onto a
+   literal answer; or jokes a little where a formal register was expected.
+ 2 misread: treats a joke, pun, absurd premise or keyboard mash as a real request ("let me check and get back
+   to you" to a pun; a literal count of something absurd); thanks someone for sarcasm; earnest lecture in
+   reply to teasing.
+ 1 badly misread: jokes about bad news, or a robotic/defensive reply to banter.
+ If no turn has any tone to read (plain factual questions), score how well the register fit: usually 4-5.
+
 HARD CAPS:
  - Claims not to know, needs to check, or will "get back"/"tell you on a call" about something any real person
    knows about their OWN life (family, partner, job, company, home, own past, own feelings or opinions):
@@ -109,7 +126,7 @@ Also list: fabrications (invented personal claims), wrong_facts, leaks (persona 
 chatbot_tells (quote the phrase), and for each turn a one-line note saying what the owner would have said instead.
 
 Reply with JSON only:
-{"knowledge_accuracy": n, "persona_fidelity": n, "naturalness": n,
+{"knowledge_accuracy": n, "persona_fidelity": n, "naturalness": n, "tone_read": n,
  "fabrications": [], "wrong_facts": [], "leaks": [], "chatbot_tells": [],
  "turn_notes": [], "summary": "one or two lines"}"""
 
@@ -171,7 +188,7 @@ def judge(scn: dict, convo: list[dict], dossier: str, samples: str, persona_rule
     prompt += "\n=== CONVERSATION ===\n" + "\n".join(lines)
     for _ in range(2):
         j = parse(_ask(prompt, model, cwd))
-        if j and all(k in j for k in ("knowledge_accuracy", "persona_fidelity", "naturalness")):
+        if j and all(k in j for k in ("knowledge_accuracy", "persona_fidelity", "naturalness", "tone_read")):
             j["judge_version"] = JUDGE_VERSION
             return j
     return {"error": "judge failed"}

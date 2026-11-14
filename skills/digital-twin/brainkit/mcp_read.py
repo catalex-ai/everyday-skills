@@ -358,14 +358,19 @@ def ask_owner(question: str, who: str = "") -> str:
 
 
 @mcp.tool()
-def check_reply(draft: str, their_message: str = "", who: str = "") -> str:
+def check_reply(draft: str, their_message: str = "", who: str = "", tone: str = "") -> str:
     """Check a draft reply before you send it. who: the relationship, as for examples().
-    Returns what to fix, or OK."""
+    tone: what they are doing, in one word: asking, joking, teasing, sarcastic, nonsense,
+    formal or sincere. Returns what to fix, or OK."""
     try:
         e = _load()
     except _Unavailable:
         return NO_PERSONA
-    fixes = style.check(draft, their_message, e["style"])
+    playful = bool(set(re.findall(r"[a-z]+", tone.lower())) & style.PLAYFUL)
+    fixes = style.tone_check(draft, tone)
+    # A joke has nothing to defer: the tone fix replaces the generic "you are putting this off" advice.
+    fixes += [f for f in style.check(draft, their_message, e["style"])
+              if not (playful and f.startswith(("You are putting", "Answer the status")))]
     near, matched = _ranked(e, their_message, who) if (their_message or who) else ([], False)
     fixes += style.local_check(draft, near, audience=who if matched else "")
     fixes += style.detail_check(draft, their_message)

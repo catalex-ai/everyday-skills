@@ -130,7 +130,7 @@ In the project you run audits from, `.claude/settings.json`:
 }
 ```
 
-A denied tool cannot be called at all — Claude cannot even ask you to approve it. Replace `google_drive` with the server name as `claude mcp list` prints it, lowercased with spaces and dashes turned into underscores. A copy to paste is at [`examples/claude-settings-readonly.json`](../examples/claude-settings-readonly.json); this repo ships it as its own `.claude/settings.json`.
+A denied tool cannot be called at all — Claude cannot even ask you to approve it. Replace `google_drive` with the server name as `claude mcp list` prints it, lowercased with spaces and dashes turned into underscores. A copy to paste is at [`examples/claude-settings-readonly.json`](../examples/claude-settings-readonly.json).
 
 If the name is wrong the rule silently does nothing, which is why you also run the Layer 4 check.
 

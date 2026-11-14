@@ -1,8 +1,8 @@
 #!/bin/bash
 # Install a CatalEx Everyday Skill into a folder you can talk to Claude from.
 #
-#   ./install.sh                 # installs Drive Detox into ~/drive-detox
-#   ./install.sh ~/my-folder     # installs it somewhere else
+#   skills/drive-detox/install.sh              # installs Drive Detox into ~/drive-detox
+#   skills/drive-detox/install.sh ~/my-folder  # installs it somewhere else
 #
 # Nothing outside the target folder is touched, and no existing file is
 # overwritten without being named below.
@@ -10,10 +10,10 @@ set -euo pipefail
 
 SKILL="drive-detox"
 TARGET="${1:-$HOME/drive-detox}"
-SOURCE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"  # this skill's own folder
 
-if [ ! -d "$SOURCE/skills/$SKILL" ]; then
-  echo "Can't find skills/$SKILL next to this script." >&2
+if [ ! -f "$SOURCE/SKILL.md" ]; then
+  echo "Can't find the $SKILL skill next to this script." >&2
   echo "Run it from inside the everyday-skills folder you downloaded." >&2
   exit 1
 fi
@@ -27,7 +27,7 @@ fi
 echo "Installing $SKILL into $TARGET"
 mkdir -p "$TARGET/.claude/skills"
 rm -rf "$TARGET/.claude/skills/$SKILL"
-cp -R "$SOURCE/skills/$SKILL" "$TARGET/.claude/skills/$SKILL"
+cp -R "$SOURCE" "$TARGET/.claude/skills/$SKILL"
 find "$TARGET/.claude/skills/$SKILL" -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
 
 SETTINGS="$TARGET/.claude/settings.json"
@@ -36,7 +36,7 @@ if [ -f "$SETTINGS" ]; then
   cp "$SETTINGS" "$BACKUP"
   echo "Kept your existing settings as $(basename "$BACKUP")"
 fi
-cp "$SOURCE/skills/$SKILL/examples/claude-settings-readonly.json" "$SETTINGS"
+cp "$SOURCE/examples/claude-settings-readonly.json" "$SETTINGS"
 
 echo "Checking the read-only guard is in place"
 printf '%s\n' '{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}' \

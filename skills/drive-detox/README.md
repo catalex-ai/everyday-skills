@@ -21,7 +21,7 @@ Three routes, easiest first:
 ## Install into a project
 
 ```bash
-./install.sh            # installs into ~/drive-detox
+./install.sh            # from this folder; installs into ~/drive-detox
 ./install.sh ~/folder   # or somewhere you choose
 ```
 

@@ -3,8 +3,6 @@
 Every module is built against this file. If you need to change a signature,
 stop and say so in your report. Don't change it silently.
 
-Spec: `docs/superpowers/specs/2026-11-09-digital-twin-design.md` (read
-Revision B: PII is a setting).
 Run tests: `cd skills/digital-twin && .venv/bin/pytest -q`.
 Python 3.12 venv already set up. Runtime deps are only `mcp`, `model2vec` and
 `PyYAML`; dev also gets `pytest`. Use only the stdlib besides those.

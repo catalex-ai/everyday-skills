@@ -33,7 +33,7 @@ Otherwise:
 ```bash
 git clone https://github.com/catalex-ai/everyday-skills.git
 cd everyday-skills
-./install.sh
+skills/drive-detox/install.sh
 ```
 
 This installs Drive Detox into `~/drive-detox` with its read-only guard, checks
@@ -75,7 +75,7 @@ evals.
 
 ## Add a skill
 
-Start from [templates/skill-template](templates/skill-template). Each skill needs
+Add a folder under [skills/](skills). Each skill needs
 a `SKILL.md`, a `README.md`, examples, tests where they apply, and clear safety
 boundaries. See [CONTRIBUTING.md](CONTRIBUTING.md).
 

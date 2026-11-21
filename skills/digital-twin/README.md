@@ -108,3 +108,11 @@ conflicts. It never shows held values.
 - `manager-agent/`, `twin-agent/`: the two agents
 - `brainkit/`: the code behind them
 - `templates/`: starting soul, voice, rules and contract
+
+## Reach it through CatalEx
+
+To talk to this agent from chats such as CatalEx, Slack, WhatsApp or Google
+Chat, tell the agent: "Read https://docs.catalex.co/agents/add-an-agent.md and
+onboard yourself onto CatalEx". It installs the `catalex` command if it is
+missing ([agent setup](https://docs.catalex.co/getting-started/agent-setup.md)),
+and `catalex --help` covers the rest.

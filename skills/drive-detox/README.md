@@ -84,3 +84,11 @@ python3 -m unittest discover -s skills/drive-detox/tests -v
 ## Safety
 
 A skill prompt is not a security boundary. Enforce read-only at the OAuth scope and permission layers too — both are covered in [references/google-drive-setup.md](references/google-drive-setup.md). Never paste credentials into chat or commit them.
+
+## Reach it through CatalEx
+
+To talk to this agent from chats such as CatalEx, Slack, WhatsApp or Google
+Chat, tell the agent: "Read https://docs.catalex.co/agents/add-an-agent.md and
+onboard yourself onto CatalEx". It installs the `catalex` command if it is
+missing ([agent setup](https://docs.catalex.co/getting-started/agent-setup.md)),
+and `catalex --help` covers the rest.
